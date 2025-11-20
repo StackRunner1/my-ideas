@@ -1,0 +1,35 @@
+# Node
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.venv/
+.venv/
+venv/
+env/
+
+# OS / Misc
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+.env*
+
+# Logs
+*.log
+
+# SQLite DB
+sqlite.db
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Build artifacts
+coverage/
