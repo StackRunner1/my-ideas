@@ -84,6 +84,7 @@ React Query providers ready, and a single Axios apiClient for HTTP calls.
 - [ ] Browser opens Vite URL (e.g., http://127.0.0.1:5173)
 - [ ] Tailwind utilities render (e.g., `text-xl` looks larger)
 - [ ] TypeScript typecheck passes: `npm run typecheck`
+  - Notes: Added `vite-env.d.ts` and removed explicit `.tsx` import extensions to fix type errors.
 
 ### 6) Clean Up
 
