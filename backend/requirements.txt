@@ -2,3 +2,5 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.0
 pydantic==2.6.4
 python-multipart==0.0.9
+black==24.10.0
+isort==5.13.2

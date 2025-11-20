@@ -13,7 +13,7 @@ updated_at: 2025-11-20T10:55:00Z
 
 # Bootstrap the Frontend (React + Vite + TypeScript + Tailwind) — Essential First Phase
 
-# Status: In Progress (TS + Tailwind integrated)
+# Status: Completed (frontend bootstrap done)
 
 ## Objective
 
@@ -80,13 +80,13 @@ React Query providers ready, and a single Axios apiClient for HTTP calls.
 
 ### 5) Run & Verify
 
-- [ ] Start dev server: `npm run dev`
-- [ ] Browser opens Vite URL (e.g., http://127.0.0.1:5173)
-- [ ] Tailwind utilities render (e.g., `text-xl` looks larger)
-- [ ] TypeScript typecheck passes: `npm run typecheck`
+- [x] Start dev server: `npm run dev`
+- [x] Browser opens Vite URL (e.g., http://127.0.0.1:5173)
+- [x] Tailwind utilities render (e.g., `text-xl` looks larger)
+- [x] TypeScript typecheck passes: `npm run typecheck`
   - Notes: Added `vite-env.d.ts` and removed explicit `.tsx` import extensions to fix type errors.
 
 ### 6) Clean Up
 
-- [ ] Remove any leftover `.jsx` or unused `.js` artifacts (completed)
-- [ ] In the FE terminal run `git status` - shows only intended files
+- [x] Remove any leftover `.jsx` or unused `.js` artifacts (completed)
+- [x] In the FE terminal run `git status` - shows only intended files
