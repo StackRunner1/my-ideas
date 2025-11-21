@@ -44,31 +44,31 @@ used interchangeably and frequently throughout the course.
 
 ### 1) Workspace Trust & Terminals
 
-- [x] Open the cloned repo in VS Code and **Trust** the workspace (Restricted
+- [ ] Open the cloned repo in VS Code and **Trust** the workspace (Restricted
       Mode banner is gone)
-- [x] Terminal → **New Terminal** (renamed tab to **FE**)
-- [x] Terminal → **New Terminal** (renamed tab to **BE**)
+- [ ] Terminal → **New Terminal** (renamed tab to **FE**)
+- [ ] Terminal → **New Terminal** (renamed tab to **BE**)
 
 ### 2) Baseline Folders & Docs
 
-- [x] Create **/docs** at repo root
-- [x] Create **/session_one** in folder /docs
-- [x] Create **/S1U1_checklist.author.md** in `/docs/session_one/`
-- [x] Create **/frontend** at repo root
-- [x] Create **/backend** at repo root
-- [x] Create **/README.md** with a one-paragraph project summary
+- [ ] Create **/docs** at repo root
+- [ ] Create **/session_one** in folder /docs
+- [ ] Create **/S1U1_checklist.author.md** in `/docs/session_one/`
+- [ ] Create **/frontend** at repo root
+- [ ] Create **/backend** at repo root
+- [ ] Create **/README.md** with a one-paragraph project summary
 
 ### 3) Repo Hygiene (root files)
 
-- [x] Add **.gitignore** (Node, Python, OS artifacts; ignore `.env*`, `dist/`,
+- [ ] Add **.gitignore** (Node, Python, OS artifacts; ignore `.env*`, `dist/`,
       `node_modules/`, `__pycache__/`)
-- [x] (Optional) Add **.editorconfig** (UTF-8, LF, final newline, trim trailing
+- [ ] (Optional) Add **.editorconfig** (UTF-8, LF, final newline, trim trailing
       whitespace, 2-space indent)
-- [x] (Optional) Add **.gitattributes** (e.g., `* text=auto eol=lf`)
+- [ ] (Optional) Add **.gitattributes** (e.g., `* text=auto eol=lf`)
 
 ### 4) Verification & Clean Slate
 
-- [x] **FE** terminal: run `git status` → no unintended changes (after commit)
-- [x] (Optional) Create a branch for D1 work: `git switch -c feat/d1-setup` (skipped; committed on main for cleanliness)
-- [x] Save a two-sentence reflection under **/docs/journal/D1.md** (what’s set
+- [ ] **FE** terminal: run `git status` → no unintended changes (after commit)
+- [ ] (Optional) Create a branch for D1 work: `git switch -c feat/d1-setup` (skipped; committed on main for cleanliness)
+- [ ] Save a two-sentence reflection under **/docs/journal/D1.md** (what’s set
       up; what to improve tomorrow)
