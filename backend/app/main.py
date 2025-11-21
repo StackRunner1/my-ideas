@@ -3,12 +3,14 @@
 Provides a minimal app with CORS and middleware that injects `x-request-id`
 and `x-duration-ms` headers, and exposes a `/health` endpoint.
 """
+
+import time
+import uuid
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-import time
-import uuid
 
 
 def create_app() -> FastAPI:
@@ -33,7 +35,11 @@ def create_app() -> FastAPI:
             duration_ms = int((time.perf_counter() - start) * 1000)
             # Ensure headers can be set on the response
             if not isinstance(response, Response):
-                response = Response(content=response.body, status_code=response.status_code, headers=dict(response.headers))
+                response = Response(
+                    content=response.body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                )
             response.headers["x-request-id"] = request_id
             response.headers["x-duration-ms"] = str(duration_ms)
             return response
