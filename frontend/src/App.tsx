@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import {
-  listIdeas,
-  createIdea,
-  voteIdea,
-  deleteIdea,
-  Idea,
-} from "./api/ideasApi";
+
+interface Idea {
+  id: number;
+  title: string;
+  description?: string | null;
+  votes: number;
+}
 
 export default function App() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -14,53 +14,33 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listIdeas();
-      setIdeas(data);
-    } catch (e: any) {
-      setError(e.message || "Failed to load ideas");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    load();
+    // No backend calls during initial scaffold — operate locally.
   }, []);
 
-  async function onSubmit(e: React.FormEvent) {
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    try {
-      const newIdea = await createIdea({ title, description });
-      setIdeas([newIdea, ...ideas]);
-      setTitle("");
-      setDescription("");
-    } catch (e: any) {
-      setError(e.message || "Failed to create idea");
-    }
+    const newIdea: Idea = {
+      id: Date.now(),
+      title: title.trim(),
+      description: description ? description.trim() : undefined,
+      votes: 0,
+    };
+    setIdeas([newIdea, ...ideas]);
+    setTitle("");
+    setDescription("");
   }
 
-  async function onVote(id: number) {
-    try {
-      const updated = await voteIdea(id);
-      setIdeas(ideas.map((i) => (i.id === id ? updated : i)));
-    } catch (e: any) {
-      setError(e.message || "Failed to vote");
-    }
+  function onVote(id: number) {
+    setIdeas(
+      ideas.map((i) => (i.id === id ? { ...i, votes: i.votes + 1 } : i))
+    );
   }
 
-  async function onDelete(id: number) {
+  function onDelete(id: number) {
     if (!confirm("Delete idea?")) return;
-    try {
-      await deleteIdea(id);
-      setIdeas(ideas.filter((i) => i.id !== id));
-    } catch (e: any) {
-      setError(e.message || "Failed to delete");
-    }
+    setIdeas(ideas.filter((i) => i.id !== id));
   }
 
   return (

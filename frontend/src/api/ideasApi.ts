@@ -30,3 +30,8 @@ export async function voteIdea(id: number): Promise<Idea> {
 export async function deleteIdea(id: number): Promise<void> {
   await apiClient.delete(`/ideas/${id}`);
 }
+
+export async function checkHealth(): Promise<{ status: string }> {
+  const res = await apiClient.get<{ status: string }>("/health");
+  return res.data;
+}

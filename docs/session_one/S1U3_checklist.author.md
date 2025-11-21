@@ -43,9 +43,13 @@ CHOOSE (preferred)
 
 - [ ] **Conda** available: `conda --version`
 - [ ] If needed: `conda init <your shell>` then restart VS Code window
-- [ ] Create env: `conda create -n ideas python=3.12 -y`
+- [ ] Create env: `conda create -n ideas python=3.12 -y` (your conda environment will be called 'ideas')
 - [ ] Activate env: `conda activate ideas`
 - [ ] Verify: `python --version` prints 3.12.x
+- [ ] Select the correct Python Interpreter from the control panel
+  - [ ] Access the control panel in VS-Code with Ctrl+Shift+P
+  - [ ] Search and select 'Python: Select Interpreter'
+  - [ ] From the search results find and select your python interpreter for conda environment 'ideas'
 
 OR
 
