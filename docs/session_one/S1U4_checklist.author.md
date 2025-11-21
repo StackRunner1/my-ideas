@@ -56,6 +56,7 @@ status is clean.
   - [ ] `SUPABASE_URL=`
   - [ ] `SUPABASE_SERVICE_ROLE_KEY=`
 - [ ] Copy `.env` in `backend/` and rename to `.env.example`
+- [ ] Copy `.env.local` in `frontend/` and rename to `.env.example`
 - [ ] Confirm `.env*` are ignored by Git
       (`git check-ignore -v frontend/.env.local backend/.env`)
 - [ ] Ask AI assistant to explain `backend/.env`, `.env.example`, and
@@ -67,22 +68,18 @@ status is clean.
       and local run quickstart
 - [ ] **docs/** exists with a **session_1/** subfolder
 - [ ] **docs/session_1/** contains the unit checklists for Unit 1-4
-- [ ] Create **AGENTS.md** at project root and ask AI Assistant to write core
-      instructons:
-  - [ ] AI-first workflow summary (file edits via agent; user runs CLI; user
-        reviews before user commits)
-  - [ ] Prompt conventions (ask for minimal diffs, file trees, acceptance
-        criteria)
+- [ ] Create **AGENTS.md** at project root and ask AI Assistant to write core instructons:
+  - [ ] AI-first workflow summary (file edits via agent; user runs CLI; user reviews before user commits)
+  - [ ] Prompt conventions (ask for minimal diffs, file trees, acceptance criteria)
   - [ ] Safety rules (no secrets; do not stage/commit/push without confirmation)
 
-### 4) Verify & Commit
+### 4) Verify & Commit (performed by user)
 
 - [ ] In terminal, run `git status` shows only intended files
 - [ ] Run the commit flow:
   - [ ] Open 'Source Control' in primary side panel
   - [ ] Review files in 'Changes'
   - [ ] Select 'Stage All Changes' ('+' button next to Changes)
-  - [ ] Click the sparkle button in the commit Message field to ask Copilot to
-        write a commit message
+  - [ ] Click the sparkle button in the commit Message field to ask Copilot to write a commit message
   - [ ] Review the message, then select 'Commit & Push' in blue split button
 - [ ] Go to your GitHub account / project and verify the commit

@@ -31,5 +31,12 @@ sqlite.db
 .vscode/
 .idea/
 
+# Allow sharing workspace settings while ignoring the rest of .vscode
+!.vscode/settings.json
+
+# Ensure example env files are tracked while real env files remain ignored
+!.env.example
+!backend/.env.example
+
 # Build artifacts
 coverage/
