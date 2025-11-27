@@ -1,4 +1,7 @@
 # Supabase Authentication Implementation - Product Requirements Document v1.1
+# RUN-5
+- key changes to scope, removing custom logic from auth process
+- intorducting basic nav Menu
 
 ## Overview
 
@@ -938,38 +941,29 @@ This approach allows thorough testing of auth components in isolation before int
 
 **Deliverables**:
 
-- [x] Create `frontend/src/config/paths.ts`:
-  - [x] Export `PATHS` object with route constants (HOME, ABOUT, DASHBOARD, IDEAS, PROFILE)
-  - [x] Use TypeScript `as const` for type safety
-  - [x] Document purpose: single source of truth for all route paths
-  - [x] Export `AppPath` type helper
-- [x] Create `frontend/src/routes/AppRoutes.tsx`:
-  - [x] Import `PATHS` from config
-  - [x] Define all application routes using `<Routes>` and `<Route>`
-  - [x] Use nested routes with layouts (PublicLayout, UserLayout)
-  - [x] Import and use `ProtectedRoute` for authenticated routes
-- [x] Create `frontend/src/layouts/PublicLayout.tsx`:
-  - [x] Simple header with logo/brand and "Sign In" button
-  - [x] "Sign In" button triggers `AuthModal` (from Unit 12)
-  - [x] Navigation links for Home and About
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Clean, minimal design for unauthenticated users
-- [x] Create `frontend/src/layouts/UserLayout.tsx`:
-  - [x] Header with `Navigation` component (from Unit 14)
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Visual distinction from PublicLayout (authenticated state visible)
-- [x] Create placeholder page components:
-  - [x] `frontend/src/pages/Home.tsx` - Landing page
-  - [x] `frontend/src/pages/About.tsx` - About page
-  - [x] `frontend/src/pages/Dashboard.tsx` - Dashboard with stats
-  - [x] `frontend/src/pages/Ideas.tsx` - Ideas list
-  - [x] `frontend/src/pages/Profile.tsx` - User profile
-- [x] Update `frontend/src/main.tsx`:
-  - [x] Import `AppRoutes` instead of `AuthTest`
-  - [x] Remove AuthTest import and usage
-  - [x] Keep BrowserRouter and Redux Provider wrapper
+- [ ] Create `frontend/src/config/paths.ts`:
+  - [ ] Export `PATHS` object with route constants (HOME, DASHBOARD, PROFILE, etc.)
+  - [ ] Use TypeScript `as const` for type safety
+  - [ ] Document purpose: single source of truth for all route paths
+- [ ] Create `frontend/src/routes/AppRoutes.tsx`:
+  - [ ] Import `PATHS` from config
+  - [ ] Define all application routes using `<Routes>` and `<Route>`
+  - [ ] Use nested routes with layouts (PublicLayout, UserLayout)
+  - [ ] Import and use `ProtectedRoute` for authenticated routes
+- [ ] Create `frontend/src/layouts/PublicLayout.tsx`:
+  - [ ] Simple header with logo/brand and "Sign In" button
+  - [ ] "Sign In" button triggers `AuthModal` (from Unit 12)
+  - [ ] Render `<Outlet />` for child routes
+  - [ ] Clean, minimal design for unauthenticated users
+- [ ] Create `frontend/src/layouts/UserLayout.tsx`:
+  - [ ] Header with navigation bar (from Unit 14)
+  - [ ] Shows logo, nav links, and user avatar with logout dropdown
+  - [ ] Render `<Outlet />` for child routes
+  - [ ] Visual distinction from PublicLayout (authenticated state visible)
+- [ ] Update `frontend/src/main.tsx`:
+  - [ ] Import `AppRoutes` instead of `AuthTest` or `App`
+  - [ ] Wrap with `<BrowserRouter>` if not already
+  - [ ] Keep Redux Provider wrapper
 
 **Example Structure**:
 

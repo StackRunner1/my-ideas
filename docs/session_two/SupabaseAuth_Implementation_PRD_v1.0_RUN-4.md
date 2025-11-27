@@ -1,4 +1,6 @@
 # Supabase Authentication Implementation - Product Requirements Document v1.1
+# Run-4 Achievements:
+- removed 'requireBeta'
 
 ## Overview
 
@@ -722,15 +724,9 @@ management
       - [ ] Update `tailwind.config.cjs` with theme configuration
       - [ ] Update `src/index.css` with CSS variables
       - [ ] Install dependencies (class-variance-authority, clsx, tailwind-merge, etc.)
-  - [ ] After init completes, install all required components in one command:
-    - [ ] Run: `npx shadcn@latest add dialog button input label tabs card checkbox avatar dropdown-menu navigation-menu separator`
-    - [ ] Components needed:
-      - [ ] `dialog, button, input, label, tabs, card, checkbox` - Auth modal and forms
-      - [ ] `avatar` - User display in navigation
-      - [ ] `dropdown-menu` - Simple logout dropdown
-      - [ ] `navigation-menu` - Main nav structure
-      - [ ] `separator` - Visual dividers
-    - [ ] This downloads and installs all components to `src/components/ui/`
+  - [ ] After init completes, install all auth components in one command:
+    - [ ] Run: `npx shadcn@latest add dialog button input label tabs card checkbox`
+    - [ ] This downloads and installs all required components to `src/components/ui/`
 - [ ] Verify installation:
   - [ ] `components.json` created in project root
   - [ ] `frontend/src/components/ui/` directory exists with components
@@ -927,155 +923,46 @@ This approach allows thorough testing of auth components in isolation before int
 
 ---
 
-### Unit 13.5: Routing Infrastructure & Path Management
+### Unit 14: Auth Status Indicator & User Menu
 
-**Goal**: Establish centralized routing patterns and type-safe path constants
-
-**Prerequisites**:
-
-- Unit 13 completed
-- React Router installed
-
-**Deliverables**:
-
-- [x] Create `frontend/src/config/paths.ts`:
-  - [x] Export `PATHS` object with route constants (HOME, ABOUT, DASHBOARD, IDEAS, PROFILE)
-  - [x] Use TypeScript `as const` for type safety
-  - [x] Document purpose: single source of truth for all route paths
-  - [x] Export `AppPath` type helper
-- [x] Create `frontend/src/routes/AppRoutes.tsx`:
-  - [x] Import `PATHS` from config
-  - [x] Define all application routes using `<Routes>` and `<Route>`
-  - [x] Use nested routes with layouts (PublicLayout, UserLayout)
-  - [x] Import and use `ProtectedRoute` for authenticated routes
-- [x] Create `frontend/src/layouts/PublicLayout.tsx`:
-  - [x] Simple header with logo/brand and "Sign In" button
-  - [x] "Sign In" button triggers `AuthModal` (from Unit 12)
-  - [x] Navigation links for Home and About
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Clean, minimal design for unauthenticated users
-- [x] Create `frontend/src/layouts/UserLayout.tsx`:
-  - [x] Header with `Navigation` component (from Unit 14)
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Visual distinction from PublicLayout (authenticated state visible)
-- [x] Create placeholder page components:
-  - [x] `frontend/src/pages/Home.tsx` - Landing page
-  - [x] `frontend/src/pages/About.tsx` - About page
-  - [x] `frontend/src/pages/Dashboard.tsx` - Dashboard with stats
-  - [x] `frontend/src/pages/Ideas.tsx` - Ideas list
-  - [x] `frontend/src/pages/Profile.tsx` - User profile
-- [x] Update `frontend/src/main.tsx`:
-  - [x] Import `AppRoutes` instead of `AuthTest`
-  - [x] Remove AuthTest import and usage
-  - [x] Keep BrowserRouter and Redux Provider wrapper
-
-**Example Structure**:
-
-```tsx
-// paths.ts
-export const PATHS = {
-  HOME: "/",
-  DASHBOARD: "/dashboard",
-  PROFILE: "/profile",
-} as const;
-
-// AppRoutes.tsx
-<Routes>
-  <Route element={<PublicLayout />}>
-    <Route path={PATHS.HOME} element={<Home />} />
-  </Route>
-  <Route element={<UserLayout />}>
-    <Route
-      path={PATHS.DASHBOARD}
-      element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      }
-    />
-  </Route>
-</Routes>;
-```
-
-**Success Criteria**:
-
-- All routes centralized in `AppRoutes.tsx`
-- Navigation uses `PATHS` constants, not hardcoded strings
-- Layouts automatically switch based on route structure
-- `<Outlet />` correctly renders child components
-- No TypeScript errors for route paths
-
-**Educational Value**:
-
-- Teaches type-safe routing patterns
-- Demonstrates layout composition with `<Outlet />`
-- Shows separation of public vs authenticated UI
-- Reinforces best practices for scalable routing
-
-**Estimated Effort**: 2-3 hours
-
----
-
-### Unit 14: Navigation Bar & Logout
-
-**Goal**: Create navigation that displays auth state and provides proper logout functionality
+**Goal**: Display current user and provide logout functionality in app header
 
 **Prerequisites**:
 
-- Unit 11.5 completed (shadcn/ui components installed)
-- Unit 13.5 completed (layouts created)
+- Unit 12 completed
 
 **Deliverables**:
 
-- [ ] Create `frontend/src/components/Navigation.tsx` component
-- [ ] Use shadcn/ui `navigation-menu`, `avatar`, `dropdown-menu` components
-- [ ] Public state (not authenticated):
-  - [ ] Show logo/brand on left
-  - [ ] Show main nav links (Home, About)
-  - [ ] Show "Sign In" button on right that triggers `AuthModal`
-- [ ] Authenticated state:
-  - [ ] Show logo/brand on left
-  - [ ] Show main nav links (Home, Dashboard, Ideas)
-  - [ ] Show user avatar with email initial on right
-  - [ ] Avatar opens dropdown menu with:
-    - [ ] Email display at top (with `separator` below)
-    - [ ] "Logout" button
+- [ ] Create `frontend/src/components/UserMenu.tsx` component
+- [ ] Display user email or "Sign In" button
+- [ ] Show avatar/icon for authenticated users
+- [ ] Implement dropdown menu on click:
+  - [ ] Profile option (navigate to `/profile`)
+  - [ ] Settings option (placeholder)
+  - [ ] Logout option
 - [ ] Implement logout handler:
   - [ ] Set loading state to true
-  - [ ] Call `authService.logout()` (async) - **Critical: clears httpOnly cookies server-side**
-  - [ ] Wait for backend logout completion (revokes refresh token)
+  - [ ] Call `authService.logout()` (async)
+  - [ ] Wait for backend logout completion
   - [ ] Dispatch `clearSession()` to reset Redux auth state
   - [ ] Clear in-memory token via `setAuthToken(null)`
-  - [ ] Clear localStorage (if any auth data stored there in future)
-  - [ ] Redirect to home page `/`
-  - [ ] Handle logout errors gracefully (still clear local state on error)
-- [ ] Show loading state during logout (disable dropdown, show spinner on avatar)
+  - [ ] Clear any cached user profile data
+  - [ ] Invalidate React Query caches (if applicable)
+  - [ ] Redirect to home page `/` or login page `/login`
+  - [ ] Handle logout errors gracefully (still clear local state)
+- [ ] Show loading spinner during logout
 - [ ] Disable logout button while loading (prevent double-click)
-- [ ] Handle missing user email gracefully (show generic avatar)
-
-**Why Proper Logout Matters**:
-
-- **httpOnly cookies cannot be cleared from JavaScript** - must call backend endpoint
-- Backend `/auth/logout` calls Supabase `auth.admin.signOut()` to revoke refresh token
-- Prevents token reuse and ensures complete session termination
-- Clearing Redux + in-memory token prevents stale UI state
+- [ ] Add user menu to app header/navbar
+- [ ] Make "Sign In" button open AuthModal
+- [ ] Add beta badge if `betaAccess === true`
+- [ ] Handle missing user data gracefully
 
 **Success Criteria**:
 
-- Public nav shows "Sign In" button
-- Authenticated nav shows avatar with dropdown
-- Logout calls backend, clears all state, redirects to home
-- Loading states prevent duplicate requests
-- Navigation switches automatically when auth state changes
-
-**Educational Value**:
-
-- Teaches proper logout implementation with httpOnly cookies
-- Demonstrates auth state visual feedback
-- Shows loading state management for async operations
-- Reinforces separation of public vs authenticated UI
+- Authenticated users see their email in header
+- Dropdown menu provides navigation and logout
+- Logout successfully terminates session
+- Sign-in button opens modal for guests
 
 **Estimated Effort**: 2-3 hours
 
@@ -1360,11 +1247,11 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 
 function MyComponent() {
-  const { isAuthenticated } = useSelector((s: RootState) => s.auth);
+  const { isAuthenticated, betaAccess } = useSelector((s: RootState) => s.auth);
 
   if (!isAuthenticated) return <SignInPrompt />;
 
-  return <div>Welcome, User!</div>;
+  return <div>Welcome, {betaAccess ? "Beta User" : "User"}!</div>;
 }
 ```
 
