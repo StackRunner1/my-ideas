@@ -1,4 +1,35 @@
 # Supabase Authentication Implementation - Product Requirements Document v1.1
+## Run-7 Achievement:
+Unit 15 Complete ✅
+Implemented:
+
+useInitAuth hook (useInitAuth.ts):
+
+Checks for existing session via /auth/me
+Extracts token expiry from JWT payload
+Attempts auto-refresh if session expired
+Handles guest state gracefully
+Returns loading and error states
+AppRoutes integration:
+
+Added useInitAuth() call at app entry point
+Loading spinner during auth initialization prevents FOUC
+Error state with retry button for network failures
+Routes only render after auth check completes
+Session restoration flow:
+
+App loads → useInitAuth runs
+Calls checkAuthStatus() → backend validates httpOnly cookies
+If valid → dispatches setSession() + fetchUserProfile()
+If expired → attempts refreshSession()
+If no session → continues as guest
+Loading spinner shown until complete
+Testing:
+
+Both servers running (backend on :8000, frontend on :5174)
+Ready to test: Login → refresh page → should stay authenticated
+No flash of unauthenticated UI during load
+Next: Ready to proceed to Unit 16 (Token Refresh Scheduler) when you're ready!
 
 ## Overview
 

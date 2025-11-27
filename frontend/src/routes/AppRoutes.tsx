@@ -3,6 +3,7 @@ import { PATHS } from "@/config/paths";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PublicLayout } from "@/layouts/PublicLayout";
 import { UserLayout } from "@/layouts/UserLayout";
+import { useInitAuth } from "@/hooks/useInitAuth";
 
 // Page components (will create these next)
 import Home from "@/pages/Home";
@@ -23,6 +24,38 @@ import Profile from "@/pages/Profile";
  * - ProtectedRoute: Guards routes that require authentication
  */
 export function AppRoutes() {
+  const { isInitialized, isLoading, error } = useInitAuth();
+
+  // Show loading spinner during auth initialization
+  if (isLoading || !isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center text-red-600">
+          <p className="text-xl font-semibold">Authentication Error</p>
+          <p className="mt-2">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-gray-900 text-white rounded hover:bg-gray-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Routes>
       {/* Public routes - accessible to everyone */}
