@@ -144,49 +144,6 @@ Critical: auth.sign_out() MUST be called server-side to revoke refresh tokens.
 Without this, old tokens can be reused even after "logout".
 ```
 
-### Complete Auth State Flow (Login/Signup → Authenticated UI)
-
-**Step-by-Step Flow**:
-
-1. **User Action**: Clicks "Sign In" button in Navigation (or PublicLayout)
-2. **Modal Opens**: AuthModal component renders with sign-in/sign-up tabs
-3. **User Submits**: Enters credentials and clicks "Sign In" or "Sign Up"
-4. **API Call**: `authService.login()` or `authService.signup()` called
-5. **Backend Response**: Returns `{ user: {...}, expiresAt: number }`
-6. **Backend Sets Cookies**: httpOnly cookies with access_token and refresh_token
-7. **Frontend Redux Update**: `dispatch(setSession({ expiresAt }))` sets:
-   - `isAuthenticated: true`
-   - `status: 'authenticated'`
-   - `expiresAt: <timestamp>`
-8. **Profile Fetch**: `dispatch(fetchUserProfile())` calls `/auth/me/profile`
-9. **Redux Profile Update**: Stores `betaAccess`, `siteBeta` flags
-10. **Modal Closes**: `onOpenChange(false)` dismisses AuthModal
-11. **Navigation Re-renders**: Reads `isAuthenticated: true` from Redux
-12. **UI Updates Immediately**:
-    - "Sign In" button disappears
-    - Avatar with user initial appears
-    - Nav links change from "Home | About" to "Home | Dashboard | Ideas"
-13. **User Sees Change**: Without route change, navigation reflects auth state
-14. **Protected Routes Accessible**: User can now click Dashboard/Ideas links
-
-**Critical Implementation Details**:
-
-- **No route redirect needed**: User stays on current page (e.g., `/`)
-- **Immediate visual feedback**: Navigation component observes Redux state changes
-- **Both layouts identical**: PublicLayout and UserLayout use same Navigation component
-- **Auth state in cookies + Redux**: Cookies for backend auth, Redux for UI state
-- **Auto token refresh**: Backend `/auth/refresh` endpoint handles token renewal
-
-**Logout Flow**:
-
-1. User clicks avatar → dropdown → "Logout"
-2. `authService.logout()` calls backend `/auth/logout`
-3. Backend revokes tokens via `auth.sign_out()` and clears cookies
-4. Frontend `dispatch(clearSession())` sets `isAuthenticated: false`
-5. Frontend `setAuthToken(null)` clears in-memory state
-6. Frontend `navigate('/')` redirects to home
-7. Navigation re-renders showing "Sign In" button
-
 ### Token Management Strategy (Standard Supabase)
 
 1. **Access Token**: Short-lived Supabase JWT stored in httpOnly cookie + Redux
@@ -818,23 +775,19 @@ management
   - [x] Error message display
 - [x] Implement sign-in handler:
   - [x] Call `authService.login(credentials)`
-  - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth, not in-memory tokens)
-  - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk to load user data
+  - [x] Dispatch `setSession(expiresAt)`
+  - [x] Store token in memory via `setAuthToken()`
+  - [x] Dispatch `fetchUserProfile()` thunk
   - [x] Close modal on success
   - [x] Display error on failure
-  - [x] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
 - [x] Implement sign-up handler:
   - [x] Validate password match
-  - [x] Validate password length (min 8 chars)
-  - [x] Validate terms acceptance
   - [x] Call `authService.signup(credentials)`
-  - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth)
-  - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk
+  - [x] Dispatch `setSession(expiresAt)`
+  - [x] Store token in memory
+  - [x] Dispatch `fetchUserProfile()`
   - [x] Close modal on success
   - [x] Display error (e.g., "Email already exists")
-  - [x] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
 - [x] Add client-side validation feedback (real-time)
 - [x] Make modal dismissible via ESC key or backdrop click (shadcn/ui Dialog default)
 - [x] Add keyboard navigation support (tab order) (shadcn/ui Dialog default)
@@ -996,17 +949,17 @@ This approach allows thorough testing of auth components in isolation before int
   - [x] Use nested routes with layouts (PublicLayout, UserLayout)
   - [x] Import and use `ProtectedRoute` for authenticated routes
 - [x] Create `frontend/src/layouts/PublicLayout.tsx`:
-  - [x] **CRITICAL**: Use shared `Navigation` component (not custom header)
-  - [x] Import `Navigation` from `@/components/Navigation`
+  - [x] Simple header with logo/brand and "Sign In" button
+  - [x] "Sign In" button triggers `AuthModal` (from Unit 12)
+  - [x] Navigation links for Home and About
   - [x] Render `<Outlet />` for child routes
   - [x] Footer with copyright
-  - [x] Navigation component adapts automatically based on Redux `isAuthenticated` state
+  - [x] Clean, minimal design for unauthenticated users
 - [x] Create `frontend/src/layouts/UserLayout.tsx`:
-  - [x] **CRITICAL**: Use same shared `Navigation` component as PublicLayout
-  - [x] Import `Navigation` from `@/components/Navigation`
+  - [x] Header with `Navigation` component (from Unit 14)
   - [x] Render `<Outlet />` for child routes
   - [x] Footer with copyright
-  - [x] Both layouts should be structurally identical (Navigation handles auth state differences)
+  - [x] Visual distinction from PublicLayout (authenticated state visible)
 - [x] Create placeholder page components:
   - [x] `frontend/src/pages/Home.tsx` - Landing page
   - [x] `frontend/src/pages/About.tsx` - About page
@@ -1050,25 +1003,9 @@ export const PATHS = {
 
 - All routes centralized in `AppRoutes.tsx`
 - Navigation uses `PATHS` constants, not hardcoded strings
-- **Both PublicLayout and UserLayout use the shared Navigation component**
-- **Navigation component displays different UI based on Redux `isAuthenticated` state**
-- After login/signup, navigation switches immediately (no route change needed)
+- Layouts automatically switch based on route structure
 - `<Outlet />` correctly renders child components
 - No TypeScript errors for route paths
-
-**Implementation Notes**:
-
-- **Layout Pattern**: Both layouts are structurally identical and use the same Navigation component
-- **Why This Works**: Navigation component reads `isAuthenticated` from Redux and conditionally renders:
-  - Public state: "Home | About | Sign In" button
-  - Auth state: "Home | Dashboard | Ideas | Avatar dropdown"
-- **UX Benefit**: User sees immediate visual feedback after login without forced redirect
-- **Auth State Flow**:
-  1. User clicks "Sign In" → AuthModal opens
-  2. Login succeeds → `dispatch(setSession())` sets `isAuthenticated: true`
-  3. Navigation component re-renders with auth state
-  4. User sees avatar dropdown, Dashboard/Ideas links appear
-  5. User can navigate to protected routes or stay on current page
 
 **Educational Value**:
 
@@ -1093,12 +1030,9 @@ export const PATHS = {
 **Deliverables**:
 
 - [x] Create `frontend/src/components/Navigation.tsx` component
-- [x] **CRITICAL**: Component must read `isAuthenticated` from Redux using `useAppSelector`
-- [x] **CRITICAL**: Component must conditionally render based on `isAuthenticated` state
 - [x] Use shadcn/ui `avatar`, `dropdown-menu`, `button` components
 - [x] Use lucide-react icons (`LogOut`, `Loader2`)
-- [x] Import and manage `AuthModal` state within Navigation (for public users)
-- [x] Public state (`isAuthenticated === false`):
+- [x] Public state (not authenticated):
   - [x] Show logo/brand on left
   - [x] Show main nav links (Home, About)
   - [x] Show "Sign In" button on right that triggers `AuthModal`
@@ -1137,43 +1071,6 @@ export const PATHS = {
 - Logout calls backend, clears all state, redirects to home
 - Loading states prevent duplicate requests
 - Navigation switches automatically when auth state changes
-
-**Testing Instructions**:
-
-- [ ] **Test Public Navigation** (Unit 13.5 + 14):
-  - [ ] Run `npm run dev` in frontend terminal
-  - [ ] Visit http://localhost:5173
-  - [ ] Verify PublicLayout displays with "Sign In" button in header
-  - [ ] Click navigation links (Home, About) - pages should load
-  - [ ] Click "Sign In" button - AuthModal should open
-- [ ] **Test Signup Flow**:
-  - [ ] In AuthModal, switch to "Sign Up" tab
-  - [ ] Enter email (e.g., `test@example.com`) and password (min 8 chars)
-  - [ ] Check "I agree to terms" checkbox
-  - [ ] Click "Sign Up" button
-  - [ ] Verify success: modal closes, navigation switches to UserLayout
-  - [ ] Verify avatar appears in header with email initial
-- [ ] **Test Authenticated Navigation**:
-  - [ ] After signup, verify nav links changed to: Home, Dashboard, Ideas
-  - [ ] Click Dashboard - should show protected dashboard page
-  - [ ] Click Ideas - should show protected ideas page
-  - [ ] Click avatar - dropdown should open showing email and "Logout" button
-- [ ] **Test Logout Flow**:
-  - [ ] Click avatar dropdown, then "Logout"
-  - [ ] Verify loading spinner appears on avatar during logout
-  - [ ] Verify redirect to home page (/)
-  - [ ] Verify navigation switches back to PublicLayout with "Sign In" button
-  - [ ] Verify cannot access /dashboard directly (should redirect to /)
-- [ ] **Test Login Flow**:
-  - [ ] Click "Sign In" button
-  - [ ] Switch to "Sign In" tab in modal
-  - [ ] Enter same credentials used for signup
-  - [ ] Click "Sign In" button
-  - [ ] Verify modal closes and UserLayout appears with avatar
-- [ ] **Test Protected Routes**:
-  - [ ] While logged out, manually navigate to http://localhost:5173/dashboard
-  - [ ] Verify automatic redirect to home page (/)
-  - [ ] Login, then navigate to /dashboard - should load successfully
 
 **Educational Value**:
 
@@ -1496,8 +1393,11 @@ function MyComponent() {
 **In Progress**: Varies  
 **Pending**: Varies
 
-**Critical Architecture Note**: All authentication is handled by Supabase's standard auth service. The
+**Critical Architecture Note**: This implementation uses **ZERO custom JWT
+logic**. All authentication is handled by Supabase's standard auth service. The
 only enhancement is the agent-user pattern, where each user has a corresponding
 agent auth account that uses the same Supabase authentication flow.
 
-This PRD serves as both implementation guide for future similar integrations and reference documentation for the standard Supabase auth pattern with agent-user enhancement.
+This PRD serves as both implementation guide for future similar integrations and
+reference documentation for the standard Supabase auth pattern with agent-user
+enhancement.

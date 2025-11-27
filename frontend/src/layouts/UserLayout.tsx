@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-// import { Navigation } from '@/components/Navigation'; // Will create in Unit 14
+import { Navigation } from "@/components/Navigation";
 
 /**
  * UserLayout Component
@@ -17,12 +17,7 @@ export function UserLayout() {
     <div className="min-h-screen flex flex-col">
       {/* Header with Navigation */}
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <p className="text-sm text-muted-foreground">
-            Navigation component will be added in Unit 14
-          </p>
-        </div>
-        {/* <Navigation /> */}
+        <Navigation />
       </header>
 
       {/* Main content - renders matched child route */}
