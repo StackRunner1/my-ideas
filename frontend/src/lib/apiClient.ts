@@ -98,64 +98,81 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // Check if error is 401 and we should attempt refresh
+    // Check if error is 401 (Unauthorized) and we should attempt token refresh
+    // Conditions that must ALL be true:
+    // 1. Status is 401 (token expired or invalid)
+    // 2. We have an original request to retry
+    // 3. Request hasn't been retried yet (prevents infinite loops)
+    // 4. Auto-refresh is enabled globally
+    // 5. This isn't the refresh endpoint itself (prevent recursive refresh)
     if (
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       allowAutoRefresh &&
-      !originalRequest.url?.includes("/auth/refresh") // Don't retry refresh endpoint itself
+      !originalRequest.url?.includes("/auth/refresh")
     ) {
-      // Check refresh cooldown
+      // Check refresh cooldown - prevent refresh spam
+      // If multiple requests fail simultaneously (e.g., user opens multiple tabs),
+      // we don't want to trigger multiple refresh calls in quick succession
       const now = Date.now();
       if (now - lastRefreshTime < REFRESH_COOLDOWN_MS) {
         console.warn("[API Client] Refresh cooldown active, rejecting request");
         return Promise.reject(error);
       }
 
-      // Mark request as retried
+      // Mark this specific request as retried to prevent infinite retry loops
       originalRequest._retry = true;
 
-      // Coalesce multiple refresh attempts
+      // Coalesce multiple refresh attempts into a single refresh call
+      // If refresh is already in progress, wait for it instead of starting another
+      // This handles the case where multiple API calls fail at the same time
       if (isRefreshing && refreshPromise) {
-        await refreshPromise;
-        // After refresh completes, retry original request
+        await refreshPromise; // Wait for ongoing refresh to complete
+        // After refresh completes, retry the original request with new token
         return apiClient(originalRequest);
       }
 
-      // Start refresh process
+      // Start refresh process - this will be shared across all pending requests
       isRefreshing = true;
       lastRefreshTime = now;
 
+      // Create refresh promise that other pending requests can await
+      // This ensures only one refresh call is made even if 10 requests fail simultaneously
       refreshPromise = (async () => {
         try {
           console.log("[API Client] Attempting token refresh...");
 
-          // Call refresh endpoint (uses httpOnly refresh_token cookie)
+          // Call backend refresh endpoint
+          // withCredentials: true ensures httpOnly refresh_token cookie is sent
+          // Backend validates refresh_token cookie and sets new access_token/refresh_token cookies
           const refreshResponse = await axios.post(
             `${BASE_URL}/auth/refresh`,
             {},
             { withCredentials: true }
           );
 
-          // Backend sets new cookies automatically, no need to extract tokens
+          // Backend automatically sets new httpOnly cookies on the response
+          // We don't need to manually extract or store tokens - they're in cookies
+          // The browser will automatically send these cookies on the next request
           console.log("[API Client] Token refreshed successfully");
 
-          // Note: We don't update inMemoryToken here because the backend
-          // will set httpOnly cookies. The next request will use the cookie.
-          // If you have access to the new token in the response, you could set it:
-          // if (refreshResponse.data.accessToken) {
-          //   setAuthToken(refreshResponse.data.accessToken);
-          // }
+          // Note: We intentionally don't update inMemoryToken here
+          // Tokens are stored in httpOnly cookies (secure, not accessible to JavaScript)
+          // If your backend returns a new access_token in the response body,
+          // you could optionally store it: setAuthToken(refreshResponse.data.accessToken)
+          // But for httpOnly cookie strategy, this isn't necessary
         } catch (refreshError) {
           console.error("[API Client] Token refresh failed:", refreshError);
 
-          // Clear token on refresh failure
+          // Clear in-memory token on refresh failure
+          // User will need to log in again
           setAuthToken(null);
 
-          // Reject with original error
+          // Reject with original error to propagate to caller
           throw refreshError;
         } finally {
+          // Clean up refresh state whether success or failure
           isRefreshing = false;
           refreshPromise = null;
         }

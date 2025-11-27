@@ -1,5 +1,23 @@
 # Supabase Authentication Implementation - Product Requirements Document v1.1
 
+# RUN-8 Achievements:
+Unit 16 Complete ✅
+Implemented:
+
+useTokenRefresh hook (useTokenRefresh.ts):
+
+Proactive scheduling: Refreshes 5 minutes before token expires
+Tab visibility handler: Detects when user returns to tab after long absence
+Multiple browser windows: Each window independently monitors and refreshes
+Cooldown protection: Prevents duplicate refreshes (1-minute minimum interval)
+Automatic rescheduling: Updates when expiresAt changes in Redux
+Session clearing: Logs out if refresh fails
+Comprehensive logging: Tracks all refresh events with timestamps
+AppRoutes integration:
+
+Added useTokenRefresh() call alongside useInitAuth()
+Runs for all authenticated users automatically
+
 ## Overview
 
 Comprehensive documentation of the **standard Supabase authentication
@@ -1541,11 +1559,9 @@ export const PATHS = {
 
 ---
 
-### Unit 17: Manual Testing & Documentation
+### Unit 17: Testing & Documentation
 
-**Goal**: Validate auth flows end-to-end through manual testing and create developer documentation
-
-**Note**: This unit focuses on **manual validation** and **documentation** to establish Definition of Done for Session 2. Automated testing frameworks (Jest, Pytest, Playwright) will be covered in future sessions.
+**Goal**: Ensure auth flows work end-to-end and document for future developers
 
 **Prerequisites**:
 
@@ -1553,47 +1569,37 @@ export const PATHS = {
 
 **Deliverables**:
 
-- [ ] **Manual Testing Validation** - Execute comprehensive testing checklist (SKIPPED - will be done by user):
-  - [ ] Sign up new user → verify both user and agent-user auth accounts created in Supabase
-  - [ ] Login existing user → verify cookies set in browser DevTools
-  - [ ] Access protected route while authenticated → confirm allowed
-  - [ ] Access protected route while guest → confirm redirected to home
-  - [ ] Logout → verify cookies cleared, redirected to home
-  - [ ] Proactive token refresh → verify new expiry set ~55 min after login (check console logs)
-  - [ ] Let token expire manually → verify auto-refresh on next request
-  - [ ] Close tab and reopen → verify session restored automatically
-  - [ ] Invalid credentials → verify error message displayed in UI
-  - [ ] Network error simulation → verify graceful error handling (disconnect network during login)
-  - [ ] Multiple browser windows → verify refresh works across tabs
-  - [ ] Tab inactive for 60+ min → verify refresh on visibility change
-- [x] **Developer Documentation** - Create comprehensive guide:
-  - [x] Create `AUTH_DEVELOPER_GUIDE.md` with usage patterns
-  - [x] Backend: how to use `get_user_client` in new endpoints (with code examples)
-  - [x] Backend: when to use admin vs user client (decision tree)
-  - [x] Frontend: how to protect new routes (ProtectedRoute vs useRequireAuth)
-  - [x] Frontend: how to access current user in components (Redux selectors)
-  - [x] Token lifecycle and refresh strategy (timeline diagram)
-  - [x] Cookie security settings by environment (local vs production)
-  - [x] Common troubleshooting scenarios (401 errors, cookie issues, CORS)
-- [x] **Code Quality** - Enhance maintainability:
-  - [x] Review and add inline comments to complex auth logic (auth_utils.py, apiClient.ts, useInitAuth.ts)
-  - [x] Add detailed inline comments explaining refresh cooldown, coalescing, JWT parsing
-  - [x] Add comments for cookie handling, session restoration, error scenarios
-- [x] **Project Documentation** - Update root README:
-  - [x] Add "Authentication" section to README.md
-  - [x] Link to AUTH_DEVELOPER_GUIDE.md
-  - [x] Document environment setup for new developers
-  - [x] Add "Running the Project" section with auth context
-  - [x] Add troubleshooting quick reference
+- [ ] Manual testing checklist:
+  - [ ] Sign up new user → both user and agent-user auth accounts created
+  - [ ] Login existing user → cookies set
+  - [ ] Access protected route while authenticated → allowed
+  - [ ] Access protected route while guest → redirected
+  - [ ] Logout → cookies cleared, redirected to home
+  - [ ] Refresh token proactively → new expiry set
+  - [ ] Let token expire → auto-refresh on next request
+  - [ ] Close tab and reopen → session restored
+  - [ ] Invalid credentials → error displayed
+  - [ ] Network error during login → graceful handling
+- [ ] Create developer documentation:
+  - [ ] Architecture diagram (already provided above)
+  - [ ] Backend: how to use `get_user_scoped_client` in new endpoints
+  - [ ] Backend: when to use admin vs user client
+  - [ ] Frontend: how to protect new routes
+  - [ ] Frontend: how to access current user in components
+  - [ ] Token lifecycle and refresh strategy
+  - [ ] Cookie security settings by environment
+  - [ ] Common troubleshooting scenarios
+- [ ] Add inline code comments for complex auth logic
+- [ ] Create this PRD as permanent reference
+- [ ] Add README section on authentication
 
 **Success Criteria**:
 
-- All manual test cases pass without errors
-- Developer documentation covers common use cases with code examples
+- All manual test cases pass
+- Documentation covers common use cases
 - New developers can implement auth-protected features without confusion
-- README clearly explains auth architecture and setup
 
-**Estimated Effort**: 3-4 hours (primarily manual testing and documentation writing)
+**Estimated Effort**: 3-4 hours
 
 ---
 

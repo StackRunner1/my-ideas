@@ -46,15 +46,24 @@ export function useInitAuth(): InitAuthState {
         if (!isMounted) return;
 
         if (userData) {
-          // Session is valid, extract token expiry from JWT
+          // Session is valid - user has active cookies and backend validated them
+          // Extract token expiry from JWT payload to enable frontend-side scheduling
           const token = userData.user.token;
-          const tokenPayload = JSON.parse(atob(token.split(".")[1]));
-          const expiresAt = tokenPayload.exp * 1000; // Convert to milliseconds
 
-          // Restore session in Redux
+          // JWT structure: header.payload.signature
+          // Split on '.', take middle part (payload), decode from base64
+          const tokenPayload = JSON.parse(atob(token.split(".")[1]));
+
+          // JWT exp claim is in seconds since epoch, convert to milliseconds
+          // This will be used by useTokenRefresh to schedule proactive refresh
+          const expiresAt = tokenPayload.exp * 1000;
+
+          // Restore session in Redux - updates isAuthenticated to true
+          // This triggers Navigation component to show authenticated UI
           dispatch(setSession({ expiresAt }));
 
-          // Load user profile
+          // Load user profile data (betaAccess, siteBeta flags)
+          // This is async but we don't await it - profile loads in background
           dispatch(fetchUserProfile());
 
           setState({
@@ -63,13 +72,15 @@ export function useInitAuth(): InitAuthState {
             error: null,
           });
         } else {
-          // No active session, try to refresh
+          // No active session from /auth/me - could be expired or never logged in
+          // Try to refresh using httpOnly refresh_token cookie (if it exists)
           try {
             const refreshData = await authService.refreshSession();
 
-            if (!isMounted) return;
+            if (!isMounted) return; // Component unmounted during refresh
 
-            // Refresh succeeded, restore session
+            // Refresh succeeded - backend had valid refresh_token cookie
+            // User was logged in before, session just expired, now restored
             dispatch(setSession({ expiresAt: refreshData.expiresAt }));
             dispatch(fetchUserProfile());
 
@@ -79,7 +90,9 @@ export function useInitAuth(): InitAuthState {
               error: null,
             });
           } catch (refreshError) {
-            // Refresh failed, clear any stale state and continue as guest
+            // Refresh failed - no valid refresh_token cookie or token invalid
+            // This is expected for users who have never logged in
+            // Clear any stale Redux state and continue as guest
             if (!isMounted) return;
 
             dispatch(clearSession());
@@ -87,7 +100,7 @@ export function useInitAuth(): InitAuthState {
             setState({
               isInitialized: true,
               isLoading: false,
-              error: null, // Not an error - just no session
+              error: null, // Not an error - just no session (user is guest)
             });
           }
         }

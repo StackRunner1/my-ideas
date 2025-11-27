@@ -141,11 +141,17 @@ async def get_current_user(request: Request, response: Response) -> Dict[str, An
             )
 
         # Check refresh cooldown to prevent abuse
-        user_key = refresh_token[:20]  # Use part of token as key
+        # Use first 20 chars of refresh token as unique user identifier
+        # This prevents same user from spamming refresh across multiple requests
+        user_key = refresh_token[:20]
         current_time = time.time()
 
         if user_key in _last_refresh_time:
             time_since_last_refresh = current_time - _last_refresh_time[user_key]
+
+            # Enforce 5-second cooldown between refresh attempts
+            # Protects against race conditions when multiple requests fail simultaneously
+            # (e.g., user opens multiple tabs, all get 401, all try to refresh)
             if time_since_last_refresh < REFRESH_COOLDOWN_SECONDS:
                 raise HTTPException(
                     status_code=429,
@@ -153,15 +159,16 @@ async def get_current_user(request: Request, response: Response) -> Dict[str, An
                 )
 
         try:
-            # Attempt to refresh session
+            # Attempt to refresh session using Supabase admin client
             admin_client = get_admin_client()
 
-            # Version-agnostic refresh approach
+            # Version-agnostic refresh approach - handles different supabase-py versions
+            # Some versions expect string, others expect dict parameter
             try:
-                # Modern supabase-py (v2.x)
+                # Modern supabase-py (v2.x) - pass refresh_token as string
                 refresh_response = admin_client.auth.refresh_session(refresh_token)
             except AttributeError:
-                # Fallback for older versions
+                # Fallback for older versions - pass as dict with key
                 refresh_response = admin_client.auth.refresh_session(
                     {"refresh_token": refresh_token}
                 )
@@ -172,17 +179,23 @@ async def get_current_user(request: Request, response: Response) -> Dict[str, An
             session = refresh_response.session
             new_access_token = session.access_token
             new_refresh_token = session.refresh_token
-            expires_in = session.expires_in or 3600
+            expires_in = (
+                session.expires_in or 3600
+            )  # Default to 1 hour if not specified
 
-            # Update refresh cooldown tracking
+            # Update refresh cooldown tracking - record this successful refresh
+            # Prevents this user from refreshing again for REFRESH_COOLDOWN_SECONDS
             _last_refresh_time[user_key] = current_time
 
-            # Set new cookies
+            # Set new httpOnly cookies on response
+            # These cookies will automatically be sent on subsequent requests
+            # Frontend never sees these tokens - prevents XSS attacks
             _set_auth_cookies(response, new_access_token, new_refresh_token, expires_in)
 
-            # Get user from refreshed session
+            # Extract user data from refreshed session
             user = session.user
 
+            # Return user data with new access token for immediate use
             return {
                 "user": {"id": user.id, "email": user.email, "token": new_access_token}
             }
