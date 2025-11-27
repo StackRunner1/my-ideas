@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PublicLayout } from "@/layouts/PublicLayout";
 import { UserLayout } from "@/layouts/UserLayout";
 import { useInitAuth } from "@/hooks/useInitAuth";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 
 // Page components (will create these next)
 import Home from "@/pages/Home";
@@ -25,6 +26,9 @@ import Profile from "@/pages/Profile";
  */
 export function AppRoutes() {
   const { isInitialized, isLoading, error } = useInitAuth();
+
+  // Enable automatic token refresh
+  useTokenRefresh();
 
   // Show loading spinner during auth initialization
   if (isLoading || !isInitialized) {

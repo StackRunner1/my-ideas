@@ -1515,20 +1515,20 @@ export const PATHS = {
 
 **Deliverables**:
 
-- [ ] Create `frontend/src/hooks/useTokenRefresh.ts` hook
-- [ ] Read `expiresAt` from Redux auth state
-- [ ] Calculate time until expiry
-- [ ] Schedule refresh 5 minutes before expiry using `setTimeout`
-- [ ] Call `authService.refreshSession()` when scheduled
-- [ ] Update Redux with new `expiresAt` on successful refresh
-- [ ] Clear session if refresh fails (user needs to re-login)
-- [ ] Clear timeout on component unmount
-- [ ] Reschedule if `expiresAt` changes (user action triggered refresh)
-- [ ] Add visibility change handler:
-  - [ ] Check expiry when tab becomes visible
-  - [ ] Refresh immediately if expired while tab was hidden
-- [ ] Add logging for refresh events (success/failure)
-- [ ] Use hook in root layout component
+- [x] Create `frontend/src/hooks/useTokenRefresh.ts` hook
+- [x] Read `expiresAt` from Redux auth state
+- [x] Calculate time until expiry
+- [x] Schedule refresh 5 minutes before expiry using `setTimeout`
+- [x] Call `authService.refreshSession()` when scheduled
+- [x] Update Redux with new `expiresAt` on successful refresh
+- [x] Clear session if refresh fails (user needs to re-login)
+- [x] Clear timeout on component unmount
+- [x] Reschedule if `expiresAt` changes (user action triggered refresh)
+- [x] Add visibility change handler:
+  - [x] Check expiry when tab becomes visible
+  - [x] Refresh immediately if expired while tab was hidden
+- [x] Add logging for refresh events (success/failure)
+- [x] Use hook in root layout component
 
 **Success Criteria**:
 
