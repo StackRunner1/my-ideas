@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+from .api.routes import auth_router
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="my-ideas-api", version="0.1.0")
@@ -45,6 +47,9 @@ def create_app() -> FastAPI:
             return response
 
     app.add_middleware(RequestIDTimingMiddleware)
+
+    # Register routers
+    app.include_router(auth_router, prefix="/api/v1")
 
     @app.get("/health")
     async def health():
