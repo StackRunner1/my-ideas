@@ -2,45 +2,35 @@
 
 ## Overview
 
-Comprehensive documentation of the **standard Supabase authentication
-integration** in the code45 platform, covering frontend and backend
-implementation with secure token management, automatic refresh, and user
-lifecycle flows.
+Comprehensive documentation of the **standard Supabase authentication integration** in the code45 platform, covering frontend and backend implementation with secure token management, automatic refresh, and user lifecycle flows.
 
-**Key Architecture**: This implementation follows **Supabase best practices**
-with zero custom JWT logic. The only enhancement: when a user signs up, we
-automatically create an **agent-user** (a separate Supabase auth user) that acts
-on behalf of the user for AI-driven database operations. Both users authenticate
-via standard Supabase `sign_in_with_password`, and both use the same
+**Key Architecture**: This implementation follows **Supabase best practices** with zero custom JWT logic. The only enhancement: when a user signs up, we automatically create an **agent-user** (a separate Supabase auth user) that acts on behalf of the user for AI-driven database operations. Both users authenticate via standard Supabase `sign_in_with_password`, and both use the same
 RLS-enforced endpoints.
 
 ## Business Context
 
-- **Problem**: Modern web applications require secure, scalable authentication
-  with minimal custom infrastructure, PLUS AI agents need secure database access
-- **Solution**: Standard Supabase Auth integration with httpOnly cookie-based
-  session management, automatic token refresh, and RLS-enforced data access.
-  Agent-users leverage the same auth flow for autonomous operations.
-- **Value**: Production-ready authentication with industry best practices,
-  reduced development time, built-in security features, and secure AI agent
-  access
+- **Problem**: Modern web applications require secure, scalable authentication with minimal custom infrastructure, PLUS AI agents need secure database access 
+- **Solution**: Standard Supabase Auth integration with httpOnly cookie-based session management, automatic token refresh, and RLS-enforced data access. Agent-users leverage the same auth flow for autonomous operations.
+- **Value**: Production-ready authentication with industry best practices, reduced development time, built-in security features, and secure AI agent access
 
 ## Implementation Scope
 
 This PRD documents the complete authentication architecture including:
 
-1. **Backend Infrastructure**: Supabase client setup, admin and user-scoped
-   clients, dependency injection patterns
-2. **Backend Auth Endpoints**: Signup, login, logout, token refresh, session
-   management
-3. **Frontend Infrastructure**: Enhanced API client with auto-refresh, Redux
-   auth state management
-4. **Frontend Auth UI**: Sign-in/sign-up modals, protected routes, auth status
-   indicators
-5. **Security Patterns**: httpOnly cookies, JWT token handling, automatic
-   agent-user creation
-6. **Integration Points**: RLS enforcement, user profile management,
-   cross-service authentication
+1. **Backend Infrastructure**: Supabase client setup, admin and user-scoped clients, dependency injection patterns
+2. **Backend Auth Endpoints**: Signup, login, logout, token refresh, session management
+3. **Frontend Infrastructure**: Enhanced API client with auto-refresh, Redux auth state management
+4. **Frontend Auth UI**: Sign-in/sign-up modals, protected routes, auth status indicators
+5. **Security Patterns**: httpOnly cookies, JWT token handling, automatic agent-user creation
+6. **Integration Points**: RLS enforcement, user profile management, cross-service authentication
+
+## AI Coding Agent (Hithub CoPilot or similar) Instructions
+**IMPORTANT**: In this PRD document, prompts aimed at the AI coding assistant to strat or continue the implementaiton of this PRD end-to-end (in cinjunction with the learner and via the Github Copilot Chat) will be marked with `## AI PROMPT` headings.
+- **The learner** pastes the prompt into the chat to initiate the start or the coninuation of the code implementation led by the ai coding assistant.
+- **AI Coding Assistant** reads and executes on the prompt IF not provided by the learner. The AI Coding Assistant should execute the tasks specified uner each unit and - upon completion - mark off each task with [x] = completed or [~] = in progress depending on status. Sections (---) marked with "PAUSE" are milestone points where the AI Coding Assistant should check in with the learner, ensure all checklists in this PRD reflect the latest progress, and await the next learner instructions OR - after approval - move to readin the next `## AI PROMPT` and start execution.
+
+
+
 
 ## Prerequisites: Environment Setup (Before Unit 1)
 
@@ -441,7 +431,7 @@ frontend/
 ├── vite.config.js                   # Vite config with path resolution
 ├── tailwind.config.cjs              # Tailwind + shadcn/ui theme
 ├── components.json                  # shadcn/ui configuration
-└── .env                             # VITE_API_BASE_URL=http://localhost:8000/api/v1
+└── .env.local                       # VITE_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
 ### Key File Relationships
@@ -467,14 +457,11 @@ frontend/
 
 ## Token Management Strategy (Standard Supabase)
 
-1. **Access Token**: Short-lived Supabase JWT stored in httpOnly cookie + Redux
-   state (for display only)
+1. **Access Token**: Short-lived Supabase JWT stored in httpOnly cookie + Redux state (for display only)
 2. **Refresh Token**: Long-lived Supabase token stored in httpOnly cookie only
-3. **Auto-Refresh**: Backend automatically refreshes expired access tokens using
-   Supabase's `refresh_session()` API
+3. **Auto-Refresh**: Backend automatically refreshes expired access tokens using Supabase's `refresh_session()` API
 4. **Fallback**: Frontend can trigger refresh on 401 responses
-5. **No Custom Logic**: All tokens generated and validated by Supabase Auth
-   service
+5. **No Custom Logic**: All tokens generated and validated by Supabase Auth service
 
 ### Client Types
 
@@ -487,18 +474,15 @@ frontend/
 
 ### Agent-User Pattern
 
-1. **Creation**: When user signs up, backend creates a second Supabase auth user
-   (agent-user) via admin client using
+1. **Creation**: When user signs up, backend creates a second Supabase auth user (agent-user) via admin client using
    `signup(email=agent_<uuid>@..., password=random)`
-2. **Storage**: Agent email + password stored in secure backend store (NOT in
-   database)
+2. **Storage**: Agent email + password stored in secure backend store (NOT in database)
 3. **Login**: When AI needs to perform DB operations, backend:
    - Calls `sign_in_with_password(agent_email, agent_password)` via admin client
    - Gets agent's Supabase session (access_token, refresh_token)
    - Creates user-scoped client with agent's token
    - Performs CRUD via standard endpoints with RLS enforcement
-4. **Security**: Agent credentials never sent to frontend; agent operations
-   logged for audit
+4. **Security**: Agent credentials never sent to frontend; agent operations logged for audit
 
 ---
 
@@ -508,16 +492,41 @@ frontend/
 
 - `[ ]` = Pending (not started)
 - `[~]` = In Progress (partially implemented)
-- `[x]` = Completed (fully implemented and tested)
+- `[ ]` = Completed (fully implemented and tested)
 
 ---
+
+## AI PROMPT:
+Initial Engagement Prompt: 
+
+I need you to implement the Supabase Authentication PRD (Beast_Mode_SB_Auth_PRD.md) end-to-end.
+
+EXECUTION REQUIREMENTS:
+- Follow the unit sequence exactly as documented (Units 1-17)
+- Mark deliverables as [x] in the PRD as you complete them
+- Ask for my approval before proceeding to each new unit OR at key milestones preceeded with sections 'PAUSE'
+- Run validation tests after each major phase (backend, frontend, integration)
+- Flag any missing dependencies or unclear requirements immediately
+
+TECHNICAL CONSTRAINTS:
+- Backend: Python 3.12+, FastAPI, Supabase Python SDK
+- Frontend: React 18.2, TypeScript, Vite, Redux Toolkit, shadcn/ui
+- Auth: Standard Supabase Auth (no custom JWT logic)
+- Cookies: httpOnly cookies for tokens (set by backend)
+- State: Redux for UI auth state, cookies for backend auth
+
+START WITH:
+- Unit 1: Supabase Client Setup
+- Confirm you understand the agent-user pattern before implementing Unit 8
+- Verify Supabase email confirmation is disabled before testing signup
+
+Begin with Unit 1.
 
 ## Phase 1: Backend Foundation
 
 ### Unit 1: Supabase Client Setup & Configuration
 
-**Goal**: Install Supabase Python SDK and establish admin/user client factory
-functions
+**Goal**: Install Supabase Python SDK and establish admin/user client factory functions
 
 **Prerequisites**:
 
@@ -530,20 +539,20 @@ functions
 
 **Deliverables**:
 
-- [x] Install `supabase` Python package via pip/requirements.txt
-- [x] Install `pydantic-settings` package via pip/requirements.txt
-- [x] Add environment variables to `.env`: `SUPABASE_URL`,
+- [ ] Install `supabase` Python package via pip/requirements.txt
+- [ ] Install `pydantic-settings` package via pip/requirements.txt
+- [ ] Add environment variables to `.env`: `SUPABASE_URL`,
       `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`
-- [x] Create `backend/app/core/config.py` with Supabase settings using Pydantic
+- [ ] Create `backend/app/core/config.py` with Supabase settings using Pydantic
       BaseSettings
-- [x] Create `backend/app/db/supabase_client.py` module
-- [x] Implement `get_admin_client()` function that returns service role client
-- [x] Implement `get_user_client(jwt)` function that returns RLS-scoped client
-- [x] Add JWT binding logic with version-agnostic fallback for
+- [ ] Create `backend/app/db/supabase_client.py` module
+- [ ] Implement `get_admin_client()` function that returns service role client
+- [ ] Implement `get_user_client(jwt)` function that returns RLS-scoped client
+- [ ] Add JWT binding logic with version-agnostic fallback for
       `postgrest.auth(token)`
-- [x] Add error handling for missing environment variables
-- [x] Add `SupabaseNotInstalledError` custom exception
-- [x] Document client usage patterns in module docstrings
+- [ ] Add error handling for missing environment variables
+- [ ] Add `SupabaseNotInstalledError` custom exception
+- [ ] Document client usage patterns in module docstrings
 
 **Success Criteria**:
 
@@ -567,24 +576,24 @@ user tokens from requests
 
 **Deliverables**:
 
-- [x] Create `backend/app/api/auth_utils.py` module
-- [x] Implement `_extract_token_from_request(request)` helper function
-- [x] Support token extraction from two sources (priority order):
-  - [x] `access_token` httpOnly cookie (primary, Supabase-generated token)
-  - [x] `Authorization: Bearer <token>` header (fallback for API clients)
-- [x] Implement `_cookie_config()` helper for environment-aware cookie settings
-- [x] Configure `secure=True` for production, `secure=False` for local/dev
-- [x] Configure `samesite="none"` for production (cross-origin),
+- [ ] Create `backend/app/api/auth_utils.py` module
+- [ ] Implement `_extract_token_from_request(request)` helper function
+- [ ] Support token extraction from two sources (priority order):
+  - [ ] `access_token` httpOnly cookie (primary, Supabase-generated token)
+  - [ ] `Authorization: Bearer <token>` header (fallback for API clients)
+- [ ] Implement `_cookie_config()` helper for environment-aware cookie settings
+- [ ] Configure `secure=True` for production, `secure=False` for local/dev
+- [ ] Configure `samesite="none"` for production (cross-origin),
       `samesite="lax"` for local
-- [x] Implement `_set_auth_cookies(response, access_token, refresh_token, ...)`
+- [ ] Implement `_set_auth_cookies(response, access_token, refresh_token, ...)`
       helper
-- [x] Set httpOnly cookies with appropriate max-age from token expiry
-- [x] Implement `get_current_user(request, response)` dependency
-- [x] Validate token using Supabase `auth.get_user(token)`
-- [x] Implement automatic token refresh on expiry using refresh_token cookie
-- [x] Handle version differences in Supabase refresh_session API
-- [x] Return user dict: `{"user": {"id": str, "email": str, "token": str}}`
-- [x] Raise 401 HTTPException if authentication fails
+- [ ] Set httpOnly cookies with appropriate max-age from token expiry
+- [ ] Implement `get_current_user(request, response)` dependency
+- [ ] Validate token using Supabase `auth.get_user(token)`
+- [ ] Implement automatic token refresh on expiry using refresh_token cookie
+- [ ] Handle version differences in Supabase refresh_session API
+- [ ] Return user dict: `{"user": {"id": str, "email": str, "token": str}}`
+- [ ] Raise 401 HTTPException if authentication fails
 
 **Success Criteria**:
 
@@ -608,18 +617,18 @@ with user context
 
 **Deliverables**:
 
-- [x] Add `get_user_scoped_client(request, response)` dependency to
+- [ ] Add `get_user_scoped_client(request, response)` dependency to
       `auth_utils.py`
-- [x] Call `get_current_user()` to validate session and get user data
-- [x] Create user-scoped client using `get_user_client(user["token"])`
-- [x] Attach `user_id` attribute to client for convenience:
+- [ ] Call `get_current_user()` to validate session and get user data
+- [ ] Create user-scoped client using `get_user_client(user["token"])`
+- [ ] Attach `user_id` attribute to client for convenience:
       `client.user_id = user_id`
-- [x] Attach `token` attribute to client: `client.token = token`
-- [x] Return client object with RLS enforcement active
-- [x] Document that client is type `Any` (no SupabaseClient class)
-- [x] Document expected attributes: `client.table()`, `client.auth`,
+- [ ] Attach `token` attribute to client: `client.token = token`
+- [ ] Return client object with RLS enforcement active
+- [ ] Document that client is type `Any` (no SupabaseClient class)
+- [ ] Document expected attributes: `client.table()`, `client.auth`,
       `client.user_id`, `client.token`
-- [x] Add usage example in docstring
+- [ ] Add usage example in docstring
 
 **Success Criteria**:
 
@@ -648,33 +657,33 @@ user AND agent-user (two separate Supabase auth accounts)
 
 **Deliverables**:
 
-- [x] Create `backend/app/api/routes/auth.py` module
-- [x] Create FastAPI router with `tags=["auth"]`
-- [x] Define `SignupRequest` Pydantic model with `email` and `password` fields
-- [x] Add password validation (min 8 chars, complexity rules optional)
-- [x] Define `AuthResponse` Pydantic model with camelCase serialization
-- [x] Implement `POST /auth/signup` endpoint:
-  - [x] **Step 1**: Call Supabase
+- [ ] Create `backend/app/api/routes/auth.py` module
+- [ ] Create FastAPI router with `tags=["auth"]`
+- [ ] Define `SignupRequest` Pydantic model with `email` and `password` fields
+- [ ] Add password validation (min 8 chars, complexity rules optional)
+- [ ] Define `AuthResponse` Pydantic model with camelCase serialization
+- [ ] Implement `POST /auth/signup` endpoint:
+  - [ ] **Step 1**: Call Supabase
         `auth.sign_up(email=user_email, password=user_password)` via admin
         client
-  - [x] Extract user `access_token`, `refresh_token`, expiry, and `user_id` from
+  - [ ] Extract user `access_token`, `refresh_token`, expiry, and `user_id` from
         response
-  - [x] **Step 2**: Generate agent-user credentials:
-    - [x] `agent_email` = `agent_{user_id}@code45.internal` (or similar pattern)
-    - [x] `agent_password` = securely generated random password (store in
+  - [ ] **Step 2**: Generate agent-user credentials:
+    - [ ] `agent_email` = `agent_{user_id}@code45.internal` (or similar pattern)
+    - [ ] `agent_password` = securely generated random password (store in
           secrets manager)
-  - [x] **Step 3**: Call Supabase
+  - [ ] **Step 3**: Call Supabase
         `auth.sign_up(email=agent_email, password=agent_password)` via admin
         client to create agent auth account
-  - [x] **Step 4**: Store agent credentials securely (NOT in database, use
+  - [ ] **Step 4**: Store agent credentials securely (NOT in database, use
         secrets manager or encrypted config) mapped to `user_id`
-  - [x] **Step 5**: Calculate `expiresAt` timestamp (now + expires_in)
-  - [x] **Step 6**: Call `_set_auth_cookies()` to store user tokens in httpOnly
+  - [ ] **Step 5**: Calculate `expiresAt` timestamp (now + expires_in)
+  - [ ] **Step 6**: Call `_set_auth_cookies()` to store user tokens in httpOnly
         cookies
-- [x] Return user data: `{"user": {"id": ..., "email": ...}, "expiresAt": ...}`
-- [x] Handle duplicate email error (400)
-- [x] Handle Supabase API errors (500)
-- [x] Add logging for successful signups (user AND agent creation)
+- [ ] Return user data: `{"user": {"id": ..., "email": ...}, "expiresAt": ...}`
+- [ ] Handle duplicate email error (400)
+- [ ] Handle Supabase API errors (500)
+- [ ] Add logging for successful signups (user AND agent creation)
 
 **Success Criteria**:
 
@@ -699,15 +708,15 @@ user AND agent-user (two separate Supabase auth accounts)
 
 **Deliverables**:
 
-- [x] Define `LoginRequest` Pydantic model with `email` and `password`
-- [x] Implement `POST /auth/login` endpoint
-- [x] Call Supabase `auth.sign_in_with_password(email=..., password=...)`
-- [x] Extract tokens and expiry from response
-- [x] Set httpOnly cookies using `_set_auth_cookies()`
-- [x] Return `AuthResponse` with user and expiresAt
-- [x] Handle invalid credentials (401)
-- [x] Handle account locked/disabled errors (403)
-- [x] Add logging for login attempts (success and failure)
+- [ ] Define `LoginRequest` Pydantic model with `email` and `password`
+- [ ] Implement `POST /auth/login` endpoint
+- [ ] Call Supabase `auth.sign_in_with_password(email=..., password=...)`
+- [ ] Extract tokens and expiry from response
+- [ ] Set httpOnly cookies using `_set_auth_cookies()`
+- [ ] Return `AuthResponse` with user and expiresAt
+- [ ] Handle invalid credentials (401)
+- [ ] Handle account locked/disabled errors (403)
+- [ ] Add logging for login attempts (success and failure)
 
 **Success Criteria**:
 
@@ -729,28 +738,28 @@ user AND agent-user (two separate Supabase auth accounts)
 
 **Deliverables**:
 
-- [x] Implement `POST /auth/logout` endpoint
-- [x] Extract access_token from request (cookie or header)
-- [x] Call Supabase `auth.sign_out()` with user's token (REQUIRED for
+- [ ] Implement `POST /auth/logout` endpoint
+- [ ] Extract access_token from request (cookie or header)
+- [ ] Call Supabase `auth.sign_out()` with user's token (REQUIRED for
       server-side invalidation)
-  - [x] This revokes the refresh token in Supabase's database
-  - [x] Prevents token reuse even if cookies leaked
-- [x] Delete `access_token` and `refresh_token` httpOnly cookies
-  - [x] Set `max_age=0` to expire immediately
-  - [x] Set same `path`, `domain`, `samesite` as when created
-- [x] Optional: Sign out agent-user session if tracking active sessions
-  - [x] Retrieve agent credentials for this user
-  - [x] Call Supabase `auth.sign_out()` for agent session
-  - [x] Clean up any cached agent tokens
-- [x] Return success response: `{"message": "Logged out successfully"}`
-- [x] Handle already-logged-out case gracefully (don't error)
-- [x] Implement `POST /auth/refresh` endpoint
-- [x] Extract refresh_token from cookie
-- [x] Call Supabase `auth.refresh_session(refresh_token)`
-- [x] Set new cookies with refreshed tokens
-- [x] Return new expiresAt timestamp
-- [x] Handle missing/invalid refresh token (401)
-- [x] Implement refresh cooldown to prevent abuse (5-second minimum between
+  - [ ] This revokes the refresh token in Supabase's database
+  - [ ] Prevents token reuse even if cookies leaked
+- [ ] Delete `access_token` and `refresh_token` httpOnly cookies
+  - [ ] Set `max_age=0` to expire immediately
+  - [ ] Set same `path`, `domain`, `samesite` as when created
+- [ ] Optional: Sign out agent-user session if tracking active sessions
+  - [ ] Retrieve agent credentials for this user
+  - [ ] Call Supabase `auth.sign_out()` for agent session
+  - [ ] Clean up any cached agent tokens
+- [ ] Return success response: `{"message": "Logged out successfully"}`
+- [ ] Handle already-logged-out case gracefully (don't error)
+- [ ] Implement `POST /auth/refresh` endpoint
+- [ ] Extract refresh_token from cookie
+- [ ] Call Supabase `auth.refresh_session(refresh_token)`
+- [ ] Set new cookies with refreshed tokens
+- [ ] Return new expiresAt timestamp
+- [ ] Handle missing/invalid refresh token (401)
+- [ ] Implement refresh cooldown to prevent abuse (5-second minimum between
       refreshes)
 
 **Success Criteria**:
@@ -780,14 +789,14 @@ profile/metadata
 
 **Deliverables**:
 
-- [x] Implement `GET /auth/me` endpoint using `get_current_user` dependency
-- [x] Return user data with automatic token refresh if needed
-- [x] Implement `GET /me/profile` endpoint using `get_user_scoped_client`
-- [x] Query user metadata from Supabase auth user metadata or app-specific
+- [ ] Implement `GET /auth/me` endpoint using `get_current_user` dependency
+- [ ] Return user data with automatic token refresh if needed
+- [ ] Implement `GET /me/profile` endpoint using `get_user_scoped_client`
+- [ ] Query user metadata from Supabase auth user metadata or app-specific
       user_profiles table (if exists)
-- [x] Return profile data: `{id, email, name, beta_access, created_at, ...}`
-- [x] Use camelCase serialization for frontend compatibility
-- [x] Add profile data to response
+- [ ] Return profile data: `{id, email, name, beta_access, created_at, ...}`
+- [ ] Use camelCase serialization for frontend compatibility
+- [ ] Add profile data to response
 
 **Success Criteria**:
 
@@ -812,32 +821,32 @@ standard Supabase auth and RLS
 
 **Deliverables**:
 
-- [x] Create `backend/app/services/agent_service.py` module
-- [x] Implement `get_agent_session(user_id)` function:
-  - [x] Retrieve agent email + password from secure storage (mapped to user_id)
-  - [x] Call Supabase `auth.sign_in_with_password(agent_email, agent_password)`
+- [ ] Create `backend/app/services/agent_service.py` module
+- [ ] Implement `get_agent_session(user_id)` function:
+  - [ ] Retrieve agent email + password from secure storage (mapped to user_id)
+  - [ ] Call Supabase `auth.sign_in_with_password(agent_email, agent_password)`
         via admin client
-  - [x] Return agent session (access_token, refresh_token)
-  - [x] Cache session for duration of access token validity
-- [x] Implement `get_agent_client(user_id)` function:
-  - [x] Get agent session via `get_agent_session(user_id)`
-  - [x] Create user-scoped client with agent's access_token:
+  - [ ] Return agent session (access_token, refresh_token)
+  - [ ] Cache session for duration of access token validity
+- [ ] Implement `get_agent_client(user_id)` function:
+  - [ ] Get agent session via `get_agent_session(user_id)`
+  - [ ] Create user-scoped client with agent's access_token:
         `get_user_client(agent_token)`
-  - [x] Return client with RLS enforcement (agent's permissions)
-- [x] Update relevant endpoints to support agent operations:
-  - [x] Add optional `agent_mode: bool = False` parameter to endpoints
-  - [x] If `agent_mode=True`, use `get_agent_client(user_id)` instead of
+  - [ ] Return client with RLS enforcement (agent's permissions)
+- [ ] Update relevant endpoints to support agent operations:
+  - [ ] Add optional `agent_mode: bool = False` parameter to endpoints
+  - [ ] If `agent_mode=True`, use `get_agent_client(user_id)` instead of
         `get_user_scoped_client()`
-  - [x] Agent operations use SAME endpoints with SAME RLS policies
-- [x] Example: `POST /units` endpoint:
-  - [x] User request: uses user's token → user's RLS context
-  - [x] Agent request: uses agent's token → agent's RLS context (potentially
+  - [ ] Agent operations use SAME endpoints with SAME RLS policies
+- [ ] Example: `POST /units` endpoint:
+  - [ ] User request: uses user's token → user's RLS context
+  - [ ] Agent request: uses agent's token → agent's RLS context (potentially
         broader permissions)
-- [x] Add audit logging for agent operations:
-  - [x] Log agent actions separately for security review
-  - [x] Include user_id, agent_id, operation, table, timestamp
-- [x] Implement agent session refresh before expiry
-- [x] Handle agent auth failures gracefully (re-authenticate or alert)
+- [ ] Add audit logging for agent operations:
+  - [ ] Log agent actions separately for security review
+  - [ ] Include user_id, agent_id, operation, table, timestamp
+- [ ] Implement agent session refresh before expiry
+- [ ] Handle agent auth failures gracefully (re-authenticate or alert)
 
 **Success Criteria**:
 
@@ -849,6 +858,22 @@ standard Supabase auth and RLS
 - Same endpoints serve both user and agent requests
 
 **Estimated Effort**: 3-4 hours
+
+---
+PAUSE
+
+## AI PROMPT:
+
+Run the validation checks below.
+
+VALIDATION CHECKLIST:
+- Start backend: python -m uvicorn app.main:app --reload
+- Test signup: curl -X POST http://localhost:8000/api/v1/auth/signup -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"testpass123"}'
+- Verify two users created in Supabase Studio (user + agent_user)
+- Test login returns session with expiresAt
+- Test /auth/me returns user data
+
+Confirm all tests pass, then proceed to Unit 9 (Frontend Setup).
 
 ---
 
@@ -866,30 +891,30 @@ support
 
 **Deliverables**:
 
-- [x] Install dependencies: `axios`
-- [x] Create `frontend/src/lib/apiClient.ts` module
-- [x] Configure base URL from environment: `VITE_API_BASE_URL` (default:
+- [ ] Install dependencies: `axios`
+- [ ] Create `frontend/src/lib/apiClient.ts` module
+- [ ] Configure base URL from environment: `VITE_API_BASE_URL` (default:
       `http://localhost:8000/api/v1`)
-- [x] Create Axios instance with `withCredentials: true` for cookie support
-- [x] Set default timeout (30 seconds)
-- [x] Add sanity check warning if base URL lacks version segment
-- [x] Implement in-memory token storage: `inMemoryToken` variable
-- [x] Export `setAuthToken(token)` function to update in-memory token
-- [x] Export `setAllowAutoRefresh(allow)` function to toggle refresh behavior
-- [x] Implement request interceptor:
-  - [x] Add `Authorization: Bearer <token>` header if in-memory token exists
-  - [x] Never read token from localStorage (security)
-- [x] Implement response interceptor for 401 errors:
-  - [x] Track refresh state to coalesce multiple 401s into single refresh
-  - [x] Call `POST /auth/refresh` on first 401
-  - [x] Update in-memory token from response
-  - [x] Retry original request with new token
-  - [x] Only retry once (set `_retry` flag)
-  - [x] Don't retry if request was to `/auth/refresh` itself
-  - [x] Clear token and reject if refresh fails
-- [x] Implement refresh cooldown (5 seconds between attempts)
-- [x] Export configured Axios instance as `apiClient`
-- [x] Add TypeScript types for common response shapes
+- [ ] Create Axios instance with `withCredentials: true` for cookie support
+- [ ] Set default timeout (30 seconds)
+- [ ] Add sanity check warning if base URL lacks version segment
+- [ ] Implement in-memory token storage: `inMemoryToken` variable
+- [ ] Export `setAuthToken(token)` function to update in-memory token
+- [ ] Export `setAllowAutoRefresh(allow)` function to toggle refresh behavior
+- [ ] Implement request interceptor:
+  - [ ] Add `Authorization: Bearer <token>` header if in-memory token exists
+  - [ ] Never read token from localStorage (security)
+- [ ] Implement response interceptor for 401 errors:
+  - [ ] Track refresh state to coalesce multiple 401s into single refresh
+  - [ ] Call `POST /auth/refresh` on first 401
+  - [ ] Update in-memory token from response
+  - [ ] Retry original request with new token
+  - [ ] Only retry once (set `_retry` flag)
+  - [ ] Don't retry if request was to `/auth/refresh` itself
+  - [ ] Clear token and reject if refresh fails
+- [ ] Implement refresh cooldown (5 seconds between attempts)
+- [ ] Export configured Axios instance as `apiClient`
+- [ ] Add TypeScript types for common response shapes
 
 **Success Criteria**:
 
@@ -913,34 +938,34 @@ support
 
 **Deliverables**:
 
-- [x] Install dependencies: `@reduxjs/toolkit`, `react-redux`
-- [x] Create `frontend/src/store/index.ts` for store configuration
-- [x] Create `frontend/src/store/authSlice.ts` module
-- [x] Define `AuthState` interface:
-  - [x] `isAuthenticated: boolean`
-  - [x] `expiresAt: number | null` (epoch ms)
-  - [x] `status: 'idle' | 'authenticated' | 'guest'`
-  - [x] `betaAccess: boolean | null`
-  - [x] `siteBeta: boolean | null`
-  - [x] `loadingProfile: boolean`
-- [x] Create slice with `createSlice`:
-  - [x] `setSession` reducer: sets auth state and expiresAt
-  - [x] `clearSession` reducer: resets to guest state
-- [x] Create `fetchUserProfile` async thunk:
-  - [x] Call `GET /me/profile`
-  - [x] Extract `betaUser` and `siteBeta` flags
-  - [x] Handle snake_case and camelCase response variations
-  - [x] Add guards to prevent stale responses from overwriting
+- [ ] Install dependencies: `@reduxjs/toolkit`, `react-redux`
+- [ ] Create `frontend/src/store/index.ts` for store configuration
+- [ ] Create `frontend/src/store/authSlice.ts` module
+- [ ] Define `AuthState` interface:
+  - [ ] `isAuthenticated: boolean`
+  - [ ] `expiresAt: number | null` (epoch ms)
+  - [ ] `status: 'idle' | 'authenticated' | 'guest'`
+  - [ ] `betaAccess: boolean | null`
+  - [ ] `siteBeta: boolean | null`
+  - [ ] `loadingProfile: boolean`
+- [ ] Create slice with `createSlice`:
+  - [ ] `setSession` reducer: sets auth state and expiresAt
+  - [ ] `clearSession` reducer: resets to guest state
+- [ ] Create `fetchUserProfile` async thunk:
+  - [ ] Call `GET /me/profile`
+  - [ ] Extract `betaUser` and `siteBeta` flags
+  - [ ] Handle snake_case and camelCase response variations
+  - [ ] Add guards to prevent stale responses from overwriting
         `betaAccess: true`
-- [x] Add extra reducers for thunk lifecycle:
-  - [x] `pending`: set `loadingProfile = true`
-  - [x] `fulfilled`: update betaAccess and siteBeta
-  - [x] `rejected`: set `loadingProfile = false`
-- [x] Export actions: `setSession`, `clearSession`
-- [x] Export thunk: `fetchUserProfile`
-- [x] Export reducer as `authReducer`
-- [x] Configure Redux store with auth slice
-- [x] Wrap app in `<Provider store={store}>`
+- [ ] Add extra reducers for thunk lifecycle:
+  - [ ] `pending`: set `loadingProfile = true`
+  - [ ] `fulfilled`: update betaAccess and siteBeta
+  - [ ] `rejected`: set `loadingProfile = false`
+- [ ] Export actions: `setSession`, `clearSession`
+- [ ] Export thunk: `fetchUserProfile`
+- [ ] Export reducer as `authReducer`
+- [ ] Configure Redux store with auth slice
+- [ ] Wrap app in `<Provider store={store}>`
 
 **Success Criteria**:
 
@@ -964,32 +989,32 @@ management
 
 **Deliverables**:
 
-- [x] Create `frontend/src/services/authService.ts` module
-- [x] Define TypeScript interfaces:
-  - [x] `AuthResponse { user: {id, email}, expiresAt: number }`
-  - [x] `SignupCredentials { email, password }`
-  - [x] `LoginCredentials { email, password }`
-- [x] Implement `signup(credentials)` function:
-  - [x] Call `POST /auth/signup` via apiClient
-  - [x] Return `AuthResponse`
-  - [x] Don't store token in localStorage
-- [x] Implement `login(credentials)` function:
-  - [x] Call `POST /auth/login`
-  - [x] Return `AuthResponse`
-- [x] Implement `logout()` function:
-  - [x] Call `POST /auth/logout` via apiClient
-  - [x] Clear in-memory token via `setAuthToken(null)`
-  - [x] Clear any localStorage auth data (if any exists)
-  - [x] Return success/error status
-- [x] Implement `refreshSession()` function:
-  - [x] Call `POST /auth/refresh`
-  - [x] Return new `expiresAt`
-- [x] Implement `checkAuthStatus()` function:
-  - [x] Call `GET /auth/me`
-  - [x] Return user data
-  - [x] Handle 401 gracefully (return null)
-- [x] Add error handling and logging
-- [x] Export all functions
+- [ ] Create `frontend/src/services/authService.ts` module
+- [ ] Define TypeScript interfaces:
+  - [ ] `AuthResponse { user: {id, email}, expiresAt: number }`
+  - [ ] `SignupCredentials { email, password }`
+  - [ ] `LoginCredentials { email, password }`
+- [ ] Implement `signup(credentials)` function:
+  - [ ] Call `POST /auth/signup` via apiClient
+  - [ ] Return `AuthResponse`
+  - [ ] Don't store token in localStorage
+- [ ] Implement `login(credentials)` function:
+  - [ ] Call `POST /auth/login`
+  - [ ] Return `AuthResponse`
+- [ ] Implement `logout()` function:
+  - [ ] Call `POST /auth/logout` via apiClient
+  - [ ] Clear in-memory token via `setAuthToken(null)`
+  - [ ] Clear any localStorage auth data (if any exists)
+  - [ ] Return success/error status
+- [ ] Implement `refreshSession()` function:
+  - [ ] Call `POST /auth/refresh`
+  - [ ] Return new `expiresAt`
+- [ ] Implement `checkAuthStatus()` function:
+  - [ ] Call `GET /auth/me`
+  - [ ] Return user data
+  - [ ] Handle 401 gracefully (return null)
+- [ ] Add error handling and logging
+- [ ] Export all functions
 
 **Success Criteria**:
 
@@ -1015,15 +1040,15 @@ management
 
 **Deliverables**:
 
-- [x] Configure TypeScript path alias:
-  - [x] Add to `tsconfig.json` compilerOptions:
+- [ ] Configure TypeScript path alias:
+  - [ ] Add to `tsconfig.json` compilerOptions:
     ```json
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
     ```
-  - [x] Add to `vite.config.js`:
+  - [ ] Add to `vite.config.js`:
     ```javascript
     import path from "path";
     // ... in defineConfig:
@@ -1079,43 +1104,43 @@ management
 
 **Deliverables**:
 
-- [x] Create `frontend/src/components/AuthModal.tsx` using shadcn/ui Dialog
-- [x] Implement modal with Tabs component: "Sign In" and "Sign Up"
-- [x] Create sign-in form using shadcn/ui components:
-  - [x] Email Input component (type=email, required)
-  - [x] Password Input component (type=password, required, min 8 chars)
-  - [x] "Forgot password?" link (placeholder for future)
-  - [x] Button component with loading state
-  - [x] Error message display
-- [x] Create sign-up form using shadcn/ui components:
-  - [x] Email Input component (type=email, required)
-  - [x] Password Input component (type=password, required, min 8 chars)
-  - [x] Confirm password Input component (must match)
-  - [x] Checkbox component for terms acceptance (required)
-  - [x] Button component with loading state
-  - [x] Error message display
-- [x] Implement sign-in handler:
-  - [x] Call `authService.login(credentials)`
-  - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth, not in-memory tokens)
-  - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk to load user data
-  - [x] Close modal on success
-  - [x] Display error on failure
-  - [x] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
-- [x] Implement sign-up handler:
-  - [x] Validate password match
-  - [x] Validate password length (min 8 chars)
-  - [x] Validate terms acceptance
-  - [x] Call `authService.signup(credentials)`
-  - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth)
-  - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk
-  - [x] Close modal on success
-  - [x] Display error (e.g., "Email already exists")
-  - [x] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
-- [x] Add client-side validation feedback (real-time)
-- [x] Make modal dismissible via ESC key or backdrop click (shadcn/ui Dialog default)
-- [x] Add keyboard navigation support (tab order) (shadcn/ui Dialog default)
+- [ ] Create `frontend/src/components/AuthModal.tsx` using shadcn/ui Dialog
+- [ ] Implement modal with Tabs component: "Sign In" and "Sign Up"
+- [ ] Create sign-in form using shadcn/ui components:
+  - [ ] Email Input component (type=email, required)
+  - [ ] Password Input component (type=password, required, min 8 chars)
+  - [ ] "Forgot password?" link (placeholder for future)
+  - [ ] Button component with loading state
+  - [ ] Error message display
+- [ ] Create sign-up form using shadcn/ui components:
+  - [ ] Email Input component (type=email, required)
+  - [ ] Password Input component (type=password, required, min 8 chars)
+  - [ ] Confirm password Input component (must match)
+  - [ ] Checkbox component for terms acceptance (required)
+  - [ ] Button component with loading state
+  - [ ] Error message display
+- [ ] Implement sign-in handler:
+  - [ ] Call `authService.login(credentials)`
+  - [ ] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
+  - [ ] Set token in memory via `setAuthToken(null)` (cookies handle auth, not in-memory tokens)
+  - [ ] **CRITICAL**: Dispatch `fetchUserProfile()` thunk to load user data
+  - [ ] Close modal on success
+  - [ ] Display error on failure
+  - [ ] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
+- [ ] Implement sign-up handler:
+  - [ ] Validate password match
+  - [ ] Validate password length (min 8 chars)
+  - [ ] Validate terms acceptance
+  - [ ] Call `authService.signup(credentials)`
+  - [ ] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
+  - [ ] Set token in memory via `setAuthToken(null)` (cookies handle auth)
+  - [ ] **CRITICAL**: Dispatch `fetchUserProfile()` thunk
+  - [ ] Close modal on success
+  - [ ] Display error (e.g., "Email already exists")
+  - [ ] **Result**: Redux `isAuthenticated` becomes `true`, Navigation component re-renders
+- [ ] Add client-side validation feedback (real-time)
+- [ ] Make modal dismissible via ESC key or backdrop click (shadcn/ui Dialog default)
+- [ ] Add keyboard navigation support (tab order) (shadcn/ui Dialog default)
 
 **Success Criteria**:
 
@@ -1127,7 +1152,20 @@ management
 
 **Testing & Validation (After Unit 12)**:
 
-Before proceeding to Unit 13, validate the auth flow:
+---
+PAUSE
+
+## AI PROMPT:
+The Auth components are created, run these validation checks.
+
+VALIDATION:
+- Run npm run dev
+- Verify AuthModal renders with sign-in/sign-up tabs
+- Test form validation (password match, min length, terms checkbox)
+- Verify shadcn/ui components render with proper styling
+- Test modal keyboard navigation (ESC to close, Tab order)
+
+Before proceeding to Unit 13, validate the auth flow and guide me through the manual tests:
 
 1. **Frontend Testing** (manual):
 
@@ -1170,6 +1208,8 @@ Before proceeding to Unit 13, validate the auth flow:
    - [ ] Confirm email confirmation is disabled (prevents `session=None` errors)
 
 **Estimated Effort**: 4-5 hours
+
+Confirm components work, then proceed to Unit 13 (Protected Routes).
 
 ---
 
@@ -1227,19 +1267,19 @@ This approach allows thorough testing of auth components in isolation before int
 
 **Deliverables**:
 
-- [x] Create `frontend/src/components/ProtectedRoute.tsx` component
-- [x] Accept `children` prop (React nodes to render if authenticated)
-- [x] Read auth state from Redux:
+- [ ] Create `frontend/src/components/ProtectedRoute.tsx` component
+- [ ] Accept `children` prop (React nodes to render if authenticated)
+- [ ] Read auth state from Redux:
       `const { isAuthenticated } = useSelector(s => s.auth)`
-- [x] If authenticated, render children
-- [x] If not authenticated, redirect to `/` (home page)
-- [x] Preserve intended destination via location state
-- [x] Create `frontend/src/hooks/useRequireAuth.ts` hook (alternative approach):
-  - [x] Check `isAuthenticated`
-  - [x] Redirect if false using `navigate('/')`
-  - [x] Support optional `redirectTo` parameter
-  - [x] Return auth state for component use
-- [x] Document both patterns (component wrapper vs hook)
+- [ ] If authenticated, render children
+- [ ] If not authenticated, redirect to `/` (home page)
+- [ ] Preserve intended destination via location state
+- [ ] Create `frontend/src/hooks/useRequireAuth.ts` hook (alternative approach):
+  - [ ] Check `isAuthenticated`
+  - [ ] Redirect if false using `navigate('/')`
+  - [ ] Support optional `redirectTo` parameter
+  - [ ] Return auth state for component use
+- [ ] Document both patterns (component wrapper vs hook)
 
 **Success Criteria**:
 
@@ -1263,38 +1303,38 @@ This approach allows thorough testing of auth components in isolation before int
 
 **Deliverables**:
 
-- [x] Create `frontend/src/config/paths.ts`:
-  - [x] Export `PATHS` object with route constants (HOME, ABOUT, DASHBOARD, IDEAS, PROFILE)
-  - [x] Use TypeScript `as const` for type safety
-  - [x] Document purpose: single source of truth for all route paths
-  - [x] Export `AppPath` type helper
-- [x] Create `frontend/src/routes/AppRoutes.tsx`:
-  - [x] Import `PATHS` from config
-  - [x] Define all application routes using `<Routes>` and `<Route>`
-  - [x] Use nested routes with layouts (PublicLayout, UserLayout)
-  - [x] Import and use `ProtectedRoute` for authenticated routes
-- [x] Create `frontend/src/layouts/PublicLayout.tsx`:
-  - [x] **CRITICAL**: Use shared `Navigation` component (not custom header)
-  - [x] Import `Navigation` from `@/components/Navigation`
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Navigation component adapts automatically based on Redux `isAuthenticated` state
-- [x] Create `frontend/src/layouts/UserLayout.tsx`:
-  - [x] **CRITICAL**: Use same shared `Navigation` component as PublicLayout
-  - [x] Import `Navigation` from `@/components/Navigation`
-  - [x] Render `<Outlet />` for child routes
-  - [x] Footer with copyright
-  - [x] Both layouts should be structurally identical (Navigation handles auth state differences)
-- [x] Create placeholder page components:
-  - [x] `frontend/src/pages/Home.tsx` - Landing page
-  - [x] `frontend/src/pages/About.tsx` - About page
-  - [x] `frontend/src/pages/Dashboard.tsx` - Dashboard with stats
-  - [x] `frontend/src/pages/Ideas.tsx` - Ideas list
-  - [x] `frontend/src/pages/Profile.tsx` - User profile
-- [x] Update `frontend/src/main.tsx`:
-  - [x] Import `AppRoutes` instead of `AuthTest`
-  - [x] Remove AuthTest import and usage
-  - [x] Keep BrowserRouter and Redux Provider wrapper
+- [ ] Create `frontend/src/config/paths.ts`:
+  - [ ] Export `PATHS` object with route constants (HOME, ABOUT, DASHBOARD, IDEAS, PROFILE)
+  - [ ] Use TypeScript `as const` for type safety
+  - [ ] Document purpose: single source of truth for all route paths
+  - [ ] Export `AppPath` type helper
+- [ ] Create `frontend/src/routes/AppRoutes.tsx`:
+  - [ ] Import `PATHS` from config
+  - [ ] Define all application routes using `<Routes>` and `<Route>`
+  - [ ] Use nested routes with layouts (PublicLayout, UserLayout)
+  - [ ] Import and use `ProtectedRoute` for authenticated routes
+- [ ] Create `frontend/src/layouts/PublicLayout.tsx`:
+  - [ ] **CRITICAL**: Use shared `Navigation` component (not custom header)
+  - [ ] Import `Navigation` from `@/components/Navigation`
+  - [ ] Render `<Outlet />` for child routes
+  - [ ] Footer with copyright
+  - [ ] Navigation component adapts automatically based on Redux `isAuthenticated` state
+- [ ] Create `frontend/src/layouts/UserLayout.tsx`:
+  - [ ] **CRITICAL**: Use same shared `Navigation` component as PublicLayout
+  - [ ] Import `Navigation` from `@/components/Navigation`
+  - [ ] Render `<Outlet />` for child routes
+  - [ ] Footer with copyright
+  - [ ] Both layouts should be structurally identical (Navigation handles auth state differences)
+- [ ] Create placeholder page components:
+  - [ ] `frontend/src/pages/Home.tsx` - Landing page
+  - [ ] `frontend/src/pages/About.tsx` - About page
+  - [ ] `frontend/src/pages/Dashboard.tsx` - Dashboard with stats
+  - [ ] `frontend/src/pages/Ideas.tsx` - Ideas list
+  - [ ] `frontend/src/pages/Profile.tsx` - User profile
+- [ ] Update `frontend/src/main.tsx`:
+  - [ ] Import `AppRoutes` instead of `AuthTest`
+  - [ ] Remove AuthTest import and usage
+  - [ ] Keep BrowserRouter and Redux Provider wrapper
 
 **Example Structure**:
 
@@ -1370,36 +1410,36 @@ export const PATHS = {
 
 **Deliverables**:
 
-- [x] Create `frontend/src/components/Navigation.tsx` component
-- [x] **CRITICAL**: Component must read `isAuthenticated` from Redux using `useAppSelector`
-- [x] **CRITICAL**: Component must conditionally render based on `isAuthenticated` state
-- [x] Use shadcn/ui `avatar`, `dropdown-menu`, `button` components
-- [x] Use lucide-react icons (`LogOut`, `Loader2`)
-- [x] Import and manage `AuthModal` state within Navigation (for public users)
-- [x] Public state (`isAuthenticated === false`):
-  - [x] Show logo/brand on left
-  - [x] Show main nav links (Home, About)
-  - [x] Show "Sign In" button on right that triggers `AuthModal`
-- [x] Authenticated state:
-  - [x] Show logo/brand on left
-  - [x] Show main nav links (Home, Dashboard, Ideas)
-  - [x] Show user avatar with email initial on right
-  - [x] Avatar opens dropdown menu with:
-    - [x] Email display at top (with `separator` below)
-    - [x] "Logout" button with icon
-- [x] Implement logout handler:
-  - [x] Set loading state to true
-  - [x] Call `authService.logout()` (async) - **Critical: clears httpOnly cookies server-side**
-  - [x] Wait for backend logout completion (revokes refresh token)
-  - [x] Dispatch `clearSession()` to reset Redux auth state
-  - [x] Clear in-memory token via `setAuthToken(null)`
-  - [x] Clear localStorage (if any auth data stored there in future)
-  - [x] Redirect to home page `/`
-  - [x] Handle logout errors gracefully (still clear local state on error)
-- [x] Show loading state during logout (disable dropdown, show spinner on avatar)
-- [x] Disable logout button while loading (prevent double-click)
-- [x] Handle missing user email gracefully (show generic avatar)
-- [x] Update `UserLayout.tsx` to use Navigation component
+- [ ] Create `frontend/src/components/Navigation.tsx` component
+- [ ] **CRITICAL**: Component must read `isAuthenticated` from Redux using `useAppSelector`
+- [ ] **CRITICAL**: Component must conditionally render based on `isAuthenticated` state
+- [ ] Use shadcn/ui `avatar`, `dropdown-menu`, `button` components
+- [ ] Use lucide-react icons (`LogOut`, `Loader2`)
+- [ ] Import and manage `AuthModal` state within Navigation (for public users)
+- [ ] Public state (`isAuthenticated === false`):
+  - [ ] Show logo/brand on left
+  - [ ] Show main nav links (Home, About)
+  - [ ] Show "Sign In" button on right that triggers `AuthModal`
+- [ ] Authenticated state:
+  - [ ] Show logo/brand on left
+  - [ ] Show main nav links (Home, Dashboard, Ideas)
+  - [ ] Show user avatar with email initial on right
+  - [ ] Avatar opens dropdown menu with:
+    - [ ] Email display at top (with `separator` below)
+    - [ ] "Logout" button with icon
+- [ ] Implement logout handler:
+  - [ ] Set loading state to true
+  - [ ] Call `authService.logout()` (async) - **Critical: clears httpOnly cookies server-side**
+  - [ ] Wait for backend logout completion (revokes refresh token)
+  - [ ] Dispatch `clearSession()` to reset Redux auth state
+  - [ ] Clear in-memory token via `setAuthToken(null)`
+  - [ ] Clear localStorage (if any auth data stored there in future)
+  - [ ] Redirect to home page `/`
+  - [ ] Handle logout errors gracefully (still clear local state on error)
+- [ ] Show loading state during logout (disable dropdown, show spinner on avatar)
+- [ ] Disable logout button while loading (prevent double-click)
+- [ ] Handle missing user email gracefully (show generic avatar)
+- [ ] Update `UserLayout.tsx` to use Navigation component
 
 **Why Proper Logout Matters**:
 
@@ -1463,6 +1503,25 @@ export const PATHS = {
 **Estimated Effort**: 2-3 hours
 
 ---
+PAUSE
+## AI PROMPT:
+Navigation and logout is implemented.RUn critical end-to-end test and explain to me the outcomes and findings:
+
+FULL AUTH FLOW TEST:
+1. Clear cookies in browser DevTools
+2. Visit http://localhost:5173
+3. Verify PublicLayout with "Sign In" button
+4. Sign up with new account
+5. EXPECTED: Modal closes, navigation switches to show avatar + Dashboard/Ideas links
+6. Click avatar → verify dropdown shows email and Logout
+7. Click Logout → verify redirect to home + navigation switches back to "Sign In"
+8. Sign in with same credentials → verify navigation switches back to auth state
+9. Try accessing /dashboard while logged out → verify redirect to /
+10. Log in → access /dashboard → verify page loads
+
+If all steps pass, we have working auth. Proceed to Unit 15 (Session Restoration).
+
+---
 
 ## Phase 5: Integration & Polish
 
@@ -1476,22 +1535,22 @@ export const PATHS = {
 
 **Deliverables**:
 
-- [x] Create `frontend/src/hooks/useInitAuth.ts` hook
-- [x] Call on app mount (in root component or layout)
-- [x] Check for existing session via `authService.checkAuthStatus()`
-- [x] If session valid:
-  - [x] Dispatch `setSession(expiresAt)`
-  - [x] Store token in memory
-  - [x] Dispatch `fetchUserProfile()`
-- [x] If session expired:
-  - [x] Attempt auto-refresh via `authService.refreshSession()`
-  - [x] If refresh succeeds, restore session
-  - [x] If refresh fails, dispatch `clearSession()`
-- [x] If no session, leave as guest
-- [x] Add loading state during initialization
-- [x] Show loading spinner in root layout until auth check complete
-- [x] Prevent rendering protected routes until check complete
-- [x] Add error handling for network failures
+- [ ] Create `frontend/src/hooks/useInitAuth.ts` hook
+- [ ] Call on app mount (in root component or layout)
+- [ ] Check for existing session via `authService.checkAuthStatus()`
+- [ ] If session valid:
+  - [ ] Dispatch `setSession(expiresAt)`
+  - [ ] Store token in memory
+  - [ ] Dispatch `fetchUserProfile()`
+- [ ] If session expired:
+  - [ ] Attempt auto-refresh via `authService.refreshSession()`
+  - [ ] If refresh succeeds, restore session
+  - [ ] If refresh fails, dispatch `clearSession()`
+- [ ] If no session, leave as guest
+- [ ] Add loading state during initialization
+- [ ] Show loading spinner in root layout until auth check complete
+- [ ] Prevent rendering protected routes until check complete
+- [ ] Add error handling for network failures
 - [ ] Implement retry logic for transient failures (optional)
 
 **Success Criteria**:
@@ -1515,20 +1574,20 @@ export const PATHS = {
 
 **Deliverables**:
 
-- [x] Create `frontend/src/hooks/useTokenRefresh.ts` hook
-- [x] Read `expiresAt` from Redux auth state
-- [x] Calculate time until expiry
-- [x] Schedule refresh 5 minutes before expiry using `setTimeout`
-- [x] Call `authService.refreshSession()` when scheduled
-- [x] Update Redux with new `expiresAt` on successful refresh
-- [x] Clear session if refresh fails (user needs to re-login)
-- [x] Clear timeout on component unmount
-- [x] Reschedule if `expiresAt` changes (user action triggered refresh)
-- [x] Add visibility change handler:
-  - [x] Check expiry when tab becomes visible
-  - [x] Refresh immediately if expired while tab was hidden
-- [x] Add logging for refresh events (success/failure)
-- [x] Use hook in root layout component
+- [ ] Create `frontend/src/hooks/useTokenRefresh.ts` hook
+- [ ] Read `expiresAt` from Redux auth state
+- [ ] Calculate time until expiry
+- [ ] Schedule refresh 5 minutes before expiry using `setTimeout`
+- [ ] Call `authService.refreshSession()` when scheduled
+- [ ] Update Redux with new `expiresAt` on successful refresh
+- [ ] Clear session if refresh fails (user needs to re-login)
+- [ ] Clear timeout on component unmount
+- [ ] Reschedule if `expiresAt` changes (user action triggered refresh)
+- [ ] Add visibility change handler:
+  - [ ] Check expiry when tab becomes visible
+  - [ ] Refresh immediately if expired while tab was hidden
+- [ ] Add logging for refresh events (success/failure)
+- [ ] Use hook in root layout component
 
 **Success Criteria**:
 
@@ -1566,25 +1625,25 @@ export const PATHS = {
   - [ ] Network error simulation → verify graceful error handling (disconnect network during login)
   - [ ] Multiple browser windows → verify refresh works across tabs
   - [ ] Tab inactive for 60+ min → verify refresh on visibility change
-- [x] **Developer Documentation** - Create comprehensive guide:
-  - [x] Create `AUTH_DEVELOPER_GUIDE.md` with usage patterns
-  - [x] Backend: how to use `get_user_client` in new endpoints (with code examples)
-  - [x] Backend: when to use admin vs user client (decision tree)
-  - [x] Frontend: how to protect new routes (ProtectedRoute vs useRequireAuth)
-  - [x] Frontend: how to access current user in components (Redux selectors)
-  - [x] Token lifecycle and refresh strategy (timeline diagram)
-  - [x] Cookie security settings by environment (local vs production)
-  - [x] Common troubleshooting scenarios (401 errors, cookie issues, CORS)
-- [x] **Code Quality** - Enhance maintainability:
-  - [x] Review and add inline comments to complex auth logic (auth_utils.py, apiClient.ts, useInitAuth.ts)
-  - [x] Add detailed inline comments explaining refresh cooldown, coalescing, JWT parsing
-  - [x] Add comments for cookie handling, session restoration, error scenarios
-- [x] **Project Documentation** - Update root README:
-  - [x] Add "Authentication" section to README.md
-  - [x] Link to AUTH_DEVELOPER_GUIDE.md
-  - [x] Document environment setup for new developers
-  - [x] Add "Running the Project" section with auth context
-  - [x] Add troubleshooting quick reference
+- [ ] **Developer Documentation** - Create comprehensive guide:
+  - [ ] Create `AUTH_DEVELOPER_GUIDE.md` with usage patterns
+  - [ ] Backend: how to use `get_user_client` in new endpoints (with code examples)
+  - [ ] Backend: when to use admin vs user client (decision tree)
+  - [ ] Frontend: how to protect new routes (ProtectedRoute vs useRequireAuth)
+  - [ ] Frontend: how to access current user in components (Redux selectors)
+  - [ ] Token lifecycle and refresh strategy (timeline diagram)
+  - [ ] Cookie security settings by environment (local vs production)
+  - [ ] Common troubleshooting scenarios (401 errors, cookie issues, CORS)
+- [ ] **Code Quality** - Enhance maintainability:
+  - [ ] Review and add inline comments to complex auth logic (auth_utils.py, apiClient.ts, useInitAuth.ts)
+  - [ ] Add detailed inline comments explaining refresh cooldown, coalescing, JWT parsing
+  - [ ] Add comments for cookie handling, session restoration, error scenarios
+- [ ] **Project Documentation** - Update root README:
+  - [ ] Add "Authentication" section to README.md
+  - [ ] Link to AUTH_DEVELOPER_GUIDE.md
+  - [ ] Document environment setup for new developers
+  - [ ] Add "Running the Project" section with auth context
+  - [ ] Add troubleshooting quick reference
 
 **Success Criteria**:
 
@@ -1618,20 +1677,14 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1  # Backend base URL
 
 ### Security Considerations
 
-1. **httpOnly Cookies**: Access/refresh tokens never exposed to JavaScript,
-   preventing XSS theft
+1. **httpOnly Cookies**: Access/refresh tokens never exposed to JavaScript, preventing XSS theft
 2. **Secure Flag**: Cookies use `secure=true` in production (HTTPS only)
-3. **SameSite Policy**: `none` for cross-origin production, `lax` for
-   same-origin dev
+3. **SameSite Policy**: `none` for cross-origin production, `lax` for same-origin dev
 4. **No localStorage**: Tokens never stored in localStorage (vulnerable to XSS)
-5. **In-Memory Only**: Frontend stores token in memory (lost on refresh,
-   restored from cookie via backend)
-6. **Service Role Protection**: Service role key only on backend, never exposed
-   to frontend
-7. **RLS Enforcement**: All user operations use user-scoped client with
-   JWT-based RLS
-8. **Agent-User Tracking**: Every Supabase user has corresponding agent_user
-   record for app-level permissions
+5. **In-Memory Only**: Frontend stores token in memory (lost on refresh, restored from cookie via backend)
+6. **Service Role Protection**: Service role key only on backend, never exposed to frontend
+7. **RLS Enforcement**: All user operations use user-scoped client with JWT-based RLS
+8. **Agent-User Tracking**: Every Supabase user has corresponding agent_user record for app-level permissions
 
 ### API Endpoint Summary
 
@@ -1693,10 +1746,8 @@ Secrets manager or encrypted config:
 1. **Security**: Zero XSS token theft incidents (httpOnly cookies)
 2. **UX**: <100ms perceived latency for authenticated requests (token in memory)
 3. **Reliability**: >99% session restoration success rate on page refresh
-4. **Developer Experience**: <5 minutes to protect new route or add
-   authenticated endpoint
-5. **Session Duration**: Users remain logged in for full token lifetime
-   (configurable, typically 1 hour with auto-refresh)
+4. **Developer Experience**: <5 minutes to protect new route or add authenticated endpoint
+5. **Session Duration**: Users remain logged in for full token lifetime (configurable, typically 1 hour with auto-refresh)
 
 ---
 
@@ -1716,6 +1767,33 @@ Secrets manager or encrypted config:
 ---
 
 ## Appendix: Common Patterns
+
+### Debugging Prompts
+
+#### If Auth State Not Updating:
+Navigation not changing after login. Debug checklist:
+
+1. Check Redux DevTools: Is isAuthenticated true after login?
+2. Check Network tab: Does /auth/login return 200 with expiresAt?
+3. Check Application tab: Are cookies set (access_token, refresh_token)?
+4. Check AuthModal handlers: Are setSession() and fetchUserProfile() dispatched?
+5. Check Navigation component: Is useAppSelector reading isAuthenticated?
+6. Check console: Any errors in Redux state updates?
+
+Report findings for each check.
+
+#### If Cookies Not Set:
+Cookies not appearing after login. Verify:
+
+1. Backend auth.py: Does /auth/login call _set_auth_cookies()?
+2. Backend response: Are Set-Cookie headers present in response?
+3. Frontend apiClient: Is withCredentials: true set?
+4. CORS settings: Is credentials allowed in backend CORS config?
+5. Domain mismatch: Are frontend (localhost:5173) and backend (localhost:8000) both localhost?
+
+Show me the relevant code sections.
+
+
 
 ### Adding a New Protected Backend Endpoint
 
