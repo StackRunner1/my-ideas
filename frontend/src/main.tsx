@@ -7,6 +7,7 @@ import { store } from "./store";
 import { AppRoutes } from "./routes/AppRoutes";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SkipLink } from "./lib/accessibility";
+import { Toaster } from "sonner";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <div id="main-content">
               <AppRoutes />
             </div>
+            <Toaster position="top-right" richColors />
           </BrowserRouter>
         </QueryClientProvider>
       </ReduxProvider>

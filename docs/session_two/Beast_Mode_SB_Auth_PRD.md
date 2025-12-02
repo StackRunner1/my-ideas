@@ -1403,8 +1403,12 @@ This approach allows thorough testing of auth components in isolation before int
 - [x] Create placeholder page components:
   - [x] `frontend/src/pages/Home.tsx` - Landing page
   - [x] `frontend/src/pages/About.tsx` - About page
-  - [x] `frontend/src/pages/Dashboard.tsx` - Dashboard with stats
-  - [x] `frontend/src/pages/Ideas.tsx` - Ideas list
+  - [x] `frontend/src/pages/Dashboard.tsx` - Dashboard with placeholder stats cards:
+    - **CRITICAL**: Use status labels that align with ideas table: "Draft", "Published", "Archived"
+    - Cards should show: "Total Ideas", "Draft", "Published" (with hardcoded 0s as placeholders)
+    - DO NOT use: "In Progress", "Completed", "Todo" (these don't match DB schema)
+    - **Note**: Real data integration happens in Session 3, Unit 12.5
+  - [x] `frontend/src/pages/Ideas.tsx` - Ideas list (placeholder for Session 3)
   - [x] `frontend/src/pages/Profile.tsx` - User profile
 - [x] Update `frontend/src/main.tsx`:
   - [x] Import `AppRoutes` instead of `AuthTest`

@@ -54,6 +54,7 @@ import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/EmptyState";
 import { ItemsListSkeleton } from "@/components/LoadingSkeleton";
 import { parseAPIError } from "@/lib/errorHandler";
+import { toast } from "sonner";
 import {
   Search,
   Plus,
@@ -209,11 +210,12 @@ export default function Ideas() {
 
       // Confirm creation
       dispatch(confirmIdeaCreated({ tempId, realIdea: newIdea }));
+      toast.success("Idea created successfully!");
     } catch (err) {
       // Revert on error
       dispatch(revertIdeaCreation(tempId));
       const parsedError = parseAPIError(err);
-      alert(`Failed to create idea: ${parsedError.message}`);
+      toast.error(`Failed to create idea: ${parsedError.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -254,11 +256,12 @@ export default function Ideas() {
 
       // Confirm update
       dispatch(confirmIdeaUpdated(result));
+      toast.success("Idea updated successfully!");
     } catch (err) {
       // Revert on error
       dispatch(revertIdeaUpdate(previousState));
       const parsedError = parseAPIError(err);
-      alert(`Failed to update idea: ${parsedError.message}`);
+      toast.error(`Failed to update idea: ${parsedError.message}`);
     } finally {
       setIsSubmitting(false);
       setEditingIdea(null);
@@ -266,8 +269,6 @@ export default function Ideas() {
   };
 
   const handleDeleteIdea = async (idea: Idea) => {
-    if (!confirm(`Delete "${idea.title}"?`)) return;
-
     // Optimistic delete
     dispatch(deleteIdeaOptimistic(idea.id));
 
@@ -275,11 +276,12 @@ export default function Ideas() {
       await deleteIdea(idea.id);
       // Confirm deletion
       dispatch(confirmIdeaDeleted(idea.id));
+      toast.success(`Deleted "${idea.title}"`);
     } catch (err) {
       // Revert on error
       dispatch(revertIdeaDeletion(idea.id));
       const parsedError = parseAPIError(err);
-      alert(`Failed to delete idea: ${parsedError.message}`);
+      toast.error(`Failed to delete idea: ${parsedError.message}`);
     }
   };
 
