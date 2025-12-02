@@ -6,12 +6,13 @@ import { UserLayout } from "@/layouts/UserLayout";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 
-// Page components (will create these next)
+// Page components
 import Home from "@/pages/Home";
 import About from "@/pages/About";
 import Dashboard from "@/pages/Dashboard";
 import Ideas from "@/pages/Ideas";
 import Profile from "@/pages/Profile";
+import StyleGuide from "@/pages/StyleGuide";
 
 /**
  * AppRoutes Component
@@ -66,6 +67,7 @@ export function AppRoutes() {
       <Route element={<PublicLayout />}>
         <Route path={PATHS.HOME} element={<Home />} />
         <Route path={PATHS.ABOUT} element={<About />} />
+        <Route path="/style-guide" element={<StyleGuide />} />
       </Route>
 
       {/* Authenticated routes - require login */}

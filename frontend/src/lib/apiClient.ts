@@ -1,5 +1,5 @@
 /**
- * Enhanced Axios API Client with Auto-Refresh
+ * Enhanced Axios API Client with Auto-Refresh and Request Tracing
  *
  * Features:
  * - httpOnly cookie support for secure token storage
@@ -7,6 +7,7 @@
  * - In-memory token storage for Authorization headers
  * - Request/response interceptors
  * - Refresh cooldown to prevent abuse
+ * - Request ID generation for end-to-end tracing
  */
 
 import axios, {
@@ -15,12 +16,27 @@ import axios, {
   AxiosResponse,
   AxiosError,
 } from "axios";
+import { logger } from "./logger";
+import { parseAPIError } from "./errorHandler";
+
+/**
+ * Generate a unique UUID v4 for request tracing
+ */
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 // Configuration
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 const TIMEOUT = 30000; // 30 seconds
 const REFRESH_COOLDOWN_MS = 5000; // 5 seconds
+const MAX_RETRIES = 2; // Maximum retry attempts for 5xx errors
+const RETRY_DELAY_MS = 1000; // Initial retry delay (exponential backoff)
 
 // In-memory token storage
 let inMemoryToken: string | null = null;
@@ -73,9 +89,20 @@ export function getAuthToken(): string | null {
   return inMemoryToken;
 }
 
-// Request Interceptor: Add Authorization header
+// Request Interceptor: Add Authorization header and request ID
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Generate and add request ID for tracing
+    const requestId = generateUUID();
+    config.headers["x-request-id"] = requestId;
+
+    // Log request in development
+    logger.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      requestId,
+      method: config.method,
+      url: config.url,
+    });
+
     // Add Authorization header if token exists
     if (inMemoryToken && config.headers) {
       config.headers.Authorization = `Bearer ${inMemoryToken}`;
@@ -83,20 +110,82 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    logger.error("API Request Error", { error: error.message });
     return Promise.reject(error);
   }
 );
 
-// Response Interceptor: Handle 401 and auto-refresh
+// Response Interceptor: Handle 401 and auto-refresh, log response
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
-    // Successful response, return as-is
+    // Log response in development
+    const requestId = response.headers["x-request-id"];
+    const duration = response.headers["x-duration-ms"];
+    logger.debug(
+      `API Response: ${response.config.method?.toUpperCase()} ${response.config.url} → ${response.status}`,
+      {
+        requestId,
+        status: response.status,
+        durationMs: duration,
+      }
+    );
     return response;
   },
   async (error: AxiosError) => {
+    // Log error details in development
+    const parsedError = parseAPIError(error);
+    logger.error("API Error", {
+      code: parsedError.code,
+      message: parsedError.message,
+      requestId: parsedError.requestId,
+      status: error.response?.status,
+    });
+
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
+      _retryCount?: number;
     };
+
+    // Handle retry logic for 5xx errors and network timeouts
+    // Only retry on server errors (5xx) and network timeouts, NOT on client errors (4xx)
+    const shouldRetry =
+      originalRequest &&
+      !originalRequest._retry &&
+      ((error.response?.status && error.response.status >= 500) ||
+        error.code === "ECONNABORTED" ||
+        error.message.includes("timeout"));
+
+    if (shouldRetry) {
+      const retryCount = (originalRequest._retryCount || 0) + 1;
+
+      if (retryCount <= MAX_RETRIES) {
+        originalRequest._retryCount = retryCount;
+        originalRequest._retry = true;
+
+        // Calculate exponential backoff delay
+        const delay = RETRY_DELAY_MS * Math.pow(2, retryCount - 1);
+
+        logger.warn(
+          `Retrying request (attempt ${retryCount}/${MAX_RETRIES}) after ${delay}ms`,
+          {
+            url: originalRequest.url,
+            method: originalRequest.method,
+            status: error.response?.status,
+          }
+        );
+
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, delay));
+
+        // Retry the request
+        return apiClient(originalRequest);
+      } else {
+        logger.error("Max retry attempts exceeded", {
+          url: originalRequest.url,
+          method: originalRequest.method,
+        });
+      }
+    }
 
     // Check if error is 401 (Unauthorized) and we should attempt token refresh
     // Conditions that must ALL be true:
@@ -115,13 +204,13 @@ apiClient.interceptors.response.use(
       // Check refresh cooldown - prevent refresh spam
       // If multiple requests fail simultaneously (e.g., user opens multiple tabs),
       // we don't want to trigger multiple refresh calls in quick succession
+      // If multiple requests fail simultaneously (e.g., user opens multiple tabs),
+      // we don't want to trigger multiple refresh calls in quick succession
       const now = Date.now();
       if (now - lastRefreshTime < REFRESH_COOLDOWN_MS) {
-        console.warn("[API Client] Refresh cooldown active, rejecting request");
+        logger.warn("Refresh cooldown active, rejecting request");
         return Promise.reject(error);
-      }
-
-      // Mark this specific request as retried to prevent infinite retry loops
+      }/ Mark this specific request as retried to prevent infinite retry loops
       originalRequest._retry = true;
 
       // Coalesce multiple refresh attempts into a single refresh call
@@ -139,9 +228,11 @@ apiClient.interceptors.response.use(
 
       // Create refresh promise that other pending requests can await
       // This ensures only one refresh call is made even if 10 requests fail simultaneously
+      // Create refresh promise that other pending requests can await
+      // This ensures only one refresh call is made even if 10 requests fail simultaneously
       refreshPromise = (async () => {
         try {
-          console.log("[API Client] Attempting token refresh...");
+          logger.info("Attempting token refresh...");
 
           // Call backend refresh endpoint
           // withCredentials: true ensures httpOnly refresh_token cookie is sent
@@ -155,7 +246,7 @@ apiClient.interceptors.response.use(
           // Backend automatically sets new httpOnly cookies on the response
           // We don't need to manually extract or store tokens - they're in cookies
           // The browser will automatically send these cookies on the next request
-          console.log("[API Client] Token refreshed successfully");
+          logger.info("Token refreshed successfully");
 
           // Note: We intentionally don't update inMemoryToken here
           // Tokens are stored in httpOnly cookies (secure, not accessible to JavaScript)
@@ -163,7 +254,9 @@ apiClient.interceptors.response.use(
           // you could optionally store it: setAuthToken(refreshResponse.data.accessToken)
           // But for httpOnly cookie strategy, this isn't necessary
         } catch (refreshError) {
-          console.error("[API Client] Token refresh failed:", refreshError);
+          logger.error("Token refresh failed", {
+            error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+          });
 
           // Clear in-memory token on refresh failure
           // User will need to log in again
@@ -176,9 +269,7 @@ apiClient.interceptors.response.use(
           isRefreshing = false;
           refreshPromise = null;
         }
-      })();
-
-      await refreshPromise;
+      })(); refreshPromise;
 
       // Retry original request with new token
       return apiClient(originalRequest);
