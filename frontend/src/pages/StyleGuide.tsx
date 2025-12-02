@@ -33,6 +33,33 @@ export default function StyleGuide() {
   const [htmlDisabled, setHtmlDisabled] = useState(false);
   const [htmlError, setHtmlError] = useState(false);
 
+  // Interactive controls state
+  const [fontSize, setFontSize] = useState(16); // px
+  const [textColor, setTextColor] = useState("#000000");
+  const [spacing, setSpacing] = useState(16); // px
+  const [borderRadius, setBorderRadius] = useState(4); // px
+  const [copiedCSS, setCopiedCSS] = useState(false);
+
+  const resetControls = () => {
+    setFontSize(16);
+    setTextColor("#000000");
+    setSpacing(16);
+    setBorderRadius(4);
+  };
+
+  const copyCSS = () => {
+    const css = `/* Custom CSS Variables */
+:root {
+  --custom-font-size: ${fontSize}px;
+  --custom-text-color: ${textColor};
+  --custom-spacing: ${spacing}px;
+  --custom-border-radius: ${borderRadius}px;
+}`;
+    navigator.clipboard.writeText(css);
+    setCopiedCSS(true);
+    setTimeout(() => setCopiedCSS(false), 2000);
+  };
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedColor(label);
@@ -151,37 +178,67 @@ export default function StyleGuide() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h1 className="text-5xl font-bold">Heading 1</h1>
+                <h1
+                  className="text-5xl font-bold"
+                  style={{ fontSize: `${fontSize * 3}px`, color: textColor }}
+                >
+                  Heading 1
+                </h1>
                 <code className="text-xs text-muted-foreground">
                   text-5xl font-bold
                 </code>
               </div>
               <div>
-                <h2 className="text-4xl font-bold">Heading 2</h2>
+                <h2
+                  className="text-4xl font-bold"
+                  style={{ fontSize: `${fontSize * 2.5}px`, color: textColor }}
+                >
+                  Heading 2
+                </h2>
                 <code className="text-xs text-muted-foreground">
                   text-4xl font-bold
                 </code>
               </div>
               <div>
-                <h3 className="text-3xl font-semibold">Heading 3</h3>
+                <h3
+                  className="text-3xl font-semibold"
+                  style={{ fontSize: `${fontSize * 2}px`, color: textColor }}
+                >
+                  Heading 3
+                </h3>
                 <code className="text-xs text-muted-foreground">
                   text-3xl font-semibold
                 </code>
               </div>
               <div>
-                <h4 className="text-2xl font-semibold">Heading 4</h4>
+                <h4
+                  className="text-2xl font-semibold"
+                  style={{ fontSize: `${fontSize * 1.5}px`, color: textColor }}
+                >
+                  Heading 4
+                </h4>
                 <code className="text-xs text-muted-foreground">
                   text-2xl font-semibold
                 </code>
               </div>
               <div>
-                <h5 className="text-xl font-medium">Heading 5</h5>
+                <h5
+                  className="text-xl font-medium"
+                  style={{ fontSize: `${fontSize * 1.25}px`, color: textColor }}
+                >
+                  Heading 5
+                </h5>
                 <code className="text-xs text-muted-foreground">
                   text-xl font-medium
                 </code>
               </div>
               <div>
-                <h6 className="text-lg font-medium">Heading 6</h6>
+                <h6
+                  className="text-lg font-medium"
+                  style={{ fontSize: `${fontSize}px`, color: textColor }}
+                >
+                  Heading 6
+                </h6>
                 <code className="text-xs text-muted-foreground">
                   text-lg font-medium
                 </code>
@@ -198,7 +255,10 @@ export default function StyleGuide() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-base">
+                <p
+                  className="text-base"
+                  style={{ fontSize: `${fontSize}px`, color: textColor }}
+                >
                   This is regular body text using the base font size with normal
                   line height. Perfect for most content blocks and readable
                   paragraphs.
@@ -206,7 +266,10 @@ export default function StyleGuide() {
                 <code className="text-xs text-muted-foreground">text-base</code>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">
+                <p
+                  className="text-sm text-muted-foreground"
+                  style={{ fontSize: `${fontSize * 0.875}px` }}
+                >
                   This is small text using the sm font size, often used for
                   secondary information and helper text.
                 </p>
@@ -215,7 +278,13 @@ export default function StyleGuide() {
                 </code>
               </div>
               <div>
-                <p className="text-lg font-medium">
+                <p
+                  className="text-lg font-medium"
+                  style={{
+                    fontSize: `${fontSize * 1.125}px`,
+                    color: textColor,
+                  }}
+                >
                   This is large text with medium weight, useful for emphasis or
                   lead paragraphs.
                 </p>
@@ -224,13 +293,98 @@ export default function StyleGuide() {
                 </code>
               </div>
               <div>
-                <p>
+                <p style={{ color: textColor }}>
                   Inline styles: <strong>bold text</strong>,{" "}
                   <em>italic text</em>,{" "}
                   <code className="px-1 py-0.5 bg-muted rounded text-sm">
                     inline code
                   </code>
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interactive Controls Panel */}
+          <Card className="bg-muted/50 border-2 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span>🎨</span> Interactive Typography Controls
+              </CardTitle>
+              <CardDescription>
+                Adjust font size and color to see changes applied to all
+                typography elements above
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Font Size Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="font-size-slider" className="font-semibold">
+                    Font Size: {fontSize}px
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Base size for body text
+                  </span>
+                </div>
+                <input
+                  id="font-size-slider"
+                  type="range"
+                  min="12"
+                  max="24"
+                  step="1"
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
+                  className="w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>12px</span>
+                  <span>18px</span>
+                  <span>24px</span>
+                </div>
+              </div>
+
+              {/* Text Color Picker */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="text-color-picker" className="font-semibold">
+                    Text Color
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    {textColor}
+                  </span>
+                </div>
+                <div className="flex gap-3 items-center">
+                  <input
+                    id="text-color-picker"
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    className="w-16 h-10 rounded border cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    placeholder="#000000"
+                    className="font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={resetControls}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Reset to Defaults
+                </Button>
+                <Button onClick={copyCSS} className="flex-1">
+                  {copiedCSS ? "✓ CSS Copied!" : "Copy CSS Variables"}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -255,19 +409,117 @@ export default function StyleGuide() {
                   { name: "xl", size: "32px", class: "w-8" },
                   { name: "2xl", size: "48px", class: "w-12" },
                   { name: "3xl", size: "64px", class: "w-16" },
-                ].map((spacing) => (
-                  <div key={spacing.name} className="flex items-center gap-4">
+                ].map((spacingToken) => (
+                  <div
+                    key={spacingToken.name}
+                    className="flex items-center gap-4"
+                  >
                     <div className="w-16 text-sm font-medium">
-                      {spacing.name}
+                      {spacingToken.name}
                     </div>
                     <div className="w-16 text-sm text-muted-foreground">
-                      {spacing.size}
+                      {spacingToken.size}
                     </div>
                     <div
-                      className={`${spacing.class} h-8 bg-primary rounded`}
+                      className={`${spacingToken.class} h-8 bg-primary rounded`}
+                      style={{ borderRadius: `${borderRadius}px` }}
                     />
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interactive Controls for Spacing */}
+          <Card className="bg-muted/50 border-2 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span>📐</span> Interactive Spacing Controls
+              </CardTitle>
+              <CardDescription>
+                Adjust spacing and border radius to see changes applied to
+                spacing blocks above
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Spacing Preset Selector */}
+              <div className="space-y-2">
+                <Label className="font-semibold">
+                  Spacing Preset: {spacing}px
+                </Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[4, 8, 12, 16, 20, 24, 32, 40].map((preset) => (
+                    <Button
+                      key={preset}
+                      onClick={() => setSpacing(preset)}
+                      variant={spacing === preset ? "default" : "outline"}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {preset}px
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Click a preset to apply that spacing value
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Border Radius Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label
+                    htmlFor="border-radius-slider"
+                    className="font-semibold"
+                  >
+                    Border Radius: {borderRadius}px
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Roundness of corners
+                  </span>
+                </div>
+                <input
+                  id="border-radius-slider"
+                  type="range"
+                  min="0"
+                  max="24"
+                  step="1"
+                  value={borderRadius}
+                  onChange={(e) => setBorderRadius(Number(e.target.value))}
+                  className="w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>0px (sharp)</span>
+                  <span>12px</span>
+                  <span>24px (round)</span>
+                </div>
+                {/* Preview Box */}
+                <div
+                  className="mt-4 p-6 bg-primary text-primary-foreground flex items-center justify-center"
+                  style={{ borderRadius: `${borderRadius}px` }}
+                >
+                  <span className="text-sm font-medium">
+                    Preview: {borderRadius}px radius
+                  </span>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={resetControls}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Reset to Defaults
+                </Button>
+                <Button onClick={copyCSS} className="flex-1">
+                  {copiedCSS ? "✓ CSS Copied!" : "Copy CSS Variables"}
+                </Button>
               </div>
             </CardContent>
           </Card>
