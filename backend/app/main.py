@@ -9,12 +9,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api.error_handlers import (
-    api_error_handler,
-    http_exception_handler,
-    unhandled_exception_handler,
-    validation_exception_handler,
-)
+from .api.error_handlers import (api_error_handler, http_exception_handler,
+                                 unhandled_exception_handler,
+                                 validation_exception_handler)
 from .api.routes import auth_router
 from .core.errors import APIError
 from .middleware.request_id import RequestIDTimingMiddleware

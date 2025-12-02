@@ -11,18 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from ...db.supabase_client import get_admin_client
-from ...services.agent_credentials import (
-    generate_agent_email,
-    generate_secure_password,
-    get_agent_credentials,
-    store_agent_credentials,
-)
-from ..auth_utils import (
-    _cookie_config,
-    _set_auth_cookies,
-    get_current_user,
-    get_user_scoped_client,
-)
+from ...services.agent_credentials import (generate_agent_email,
+                                           generate_secure_password,
+                                           get_agent_credentials,
+                                           store_agent_credentials)
+from ..auth_utils import (_cookie_config, _set_auth_cookies, get_current_user,
+                          get_user_scoped_client)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

@@ -158,6 +158,7 @@ def get_admin_client() -> Any:
         supabase_key=settings.supabase_service_role_key,
     )
 
+
 @retry_on_transient_error()
 def get_user_client(jwt: str) -> Any:
     """Create a Supabase client scoped to a user's JWT (enforces RLS).

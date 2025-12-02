@@ -11,7 +11,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from ..core.logging import set_request_id, clear_request_id, get_logger
+from ..core.logging import clear_request_id, get_logger, set_request_id
 
 logger = get_logger(__name__)
 

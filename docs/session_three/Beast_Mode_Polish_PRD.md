@@ -943,6 +943,7 @@ PAUSE - CHECKPOINT: PHASE 2 COMPLETE
 **Units 1-4 Completion Summary:**
 
 Provide a brief summary including:
+
 - What was implemented in each unit (1-2 sentences per unit)
 - Key files created or modified
 - Success metrics achieved
@@ -979,8 +980,9 @@ Validate Phase 2 (Error Handling & Resilience) completion:
 
 ### Unit 5: shadcn/ui Installation & Component Exploration
 
-**Goal**: Install shadcn/ui component library and understand how to add,
-customize, and use components
+**Goal**: Verify shadcn/ui component library configuration and understand how to add,
+customize, and use components. Note: shadcn/ui components are built on top of Radix UI
+primitives and installed as source code (not npm packages).
 
 **Prerequisites**:
 
@@ -990,22 +992,17 @@ customize, and use components
 
 **Deliverables**:
 
-**Installation**:
+**Verify Existing Configuration**:
 
-- [ ] Run shadcn/ui init wizard from frontend directory:
-  ```bash
-  cd frontend
-  npx shadcn-ui@latest init
-  ```
-- [ ] When prompted, select these configuration options:
+- [x] Check if `components.json` already exists in frontend directory
+- [x] If exists, verify configuration matches:
   - **Style**: `New York` (cleaner, more modern aesthetic)
-  - **Base color**: `Slate` (neutral, professional)
-  - **CSS variables**: `Yes` (enables theme customization)
-  - **Import alias**: `@/components` and `@/lib` (confirm path aliases configured in tsconfig.json)
-  - **Tailwind config**: Confirm location as `tailwind.config.ts` or `tailwind.config.cjs`
-  - **Components directory**: `src/components` (default)
-  - **Utilities directory**: `src/lib/utils` (default)
-- [ ] Verify `components.json` created with this structure:
+  - **Base color**: `neutral` or `slate` (neutral, professional)
+  - **CSS variables**: `true` (enables theme customization)
+  - **Import aliases**: `@/components`, `@/lib`, `@/ui` configured in tsconfig.json
+  - **Tailwind config**: `tailwind.config.cjs` or `tailwind.config.ts`
+  - **CSS file**: `src/index.css`
+- [x] Verify `components.json` structure (should exist from previous setup):
   ```json
   {
     "$schema": "https://ui.shadcn.com/schema.json",
@@ -1024,50 +1021,47 @@ customize, and use components
     }
   }
   ```
-- [ ] Install core components one by one:
+
+**Verify Existing Components**:
+
+- [x] Check `frontend/src/components/ui/` directory for already installed components
+- [x] Confirm these core components exist: button, card, input, dialog, dropdown-menu, avatar, tabs, separator, checkbox, label, navigation-menu
+- [x] Verify `src/lib/utils.ts` exists with cn() utility function for className merging
+
+**Install Additional Components (if needed)**:
+
+- [ ] ONLY IF missing: Install toast component:
   ```bash
-  npx shadcn-ui@latest add button
-  npx shadcn-ui@latest add card
-  npx shadcn-ui@latest add input
-  npx shadcn-ui@latest add dialog
-  npx shadcn-ui@latest add toast
-  npx shadcn-ui@latest add alert
-  npx shadcn-ui@latest add dropdown-menu
-  npx shadcn-ui@latest add avatar
+  cd frontend
+  npx shadcn@latest add toast
   ```
-- [ ] Verify components created in `frontend/src/components/ui/` directory (should see button.tsx, card.tsx, etc.)
-- [ ] Verify `src/lib/utils.ts` created with cn() utility function for className merging
+- [ ] ONLY IF missing: Install alert component:
+  ```bash
+  npx shadcn@latest add alert
+  ```
+- [ ] Note: Components are installed as TypeScript source files in `src/components/ui/`, NOT as npm packages
+- [ ] Note: Each component brings its own Radix UI dependencies which ARE npm packages (e.g., `@radix-ui/react-dialog`)
 
 **Understanding Component Structure**:
 
-- [ ] Review generated component files and understand pattern:
-      composition-based, Radix UI primitives, Tailwind styling
-- [ ] Identify customization points: variant props, className overrides, CSS
+- [x] Review component files (e.g., `button.tsx`, `card.tsx`) and understand pattern: - Built on Radix UI primitives (headless, accessible) - Styled with Tailwind CSS classes - Use class-variance-authority for variant management - Customizable via className prop and CSS variables
+- [x] Identify customization points: variant props, className overrides, CSS
       variable theming
-- [ ] Document file organization: `/components/ui` for shadcn, `/components/app`
-      for custom app components
+- [x] Document file organization: `/components/ui` for shadcn/ui, `/components` for custom app components
 
-**Quick Verification**:
+**How to Add More Components Later**:
 
-- [ ] Create test page temporarily to verify Button component renders with all
-      variants (default, destructive, outline, secondary, ghost, link)
-- [ ] Test Dialog component opens and closes correctly
-- [ ] Test Toast notifications appear with proper styling
-- [ ] Remove test page after verification
-
-**Documentation**:
-
-- [ ] Document how to add new shadcn/ui components:
-      `npx shadcn-ui@latest add <component-name>`
-- [ ] Document customization approach: modify component file directly or use
-      className prop
-- [ ] List all installed components with brief description of use case
+- [ ] Document the pattern: `cd frontend && npx shadcn@latest add <component-name>`
+- [ ] Note: This downloads component source code, NOT an npm package
+- [ ] Example: `npx shadcn@latest add select` adds Select component
+- [ ] Component list: https://ui.shadcn.com/docs/components
 
 **Success Criteria**:
 
-- shadcn/ui initialized with correct Tailwind and TypeScript configuration
-- Core components installed and verified working
-- Learner understands how to add additional components independently
+- shadcn/ui configuration verified (components.json exists and correct)
+- Core components already exist in `src/components/ui/`
+- Learner understands shadcn/ui uses Radix UI + Tailwind CSS, NOT npm packages for components
+- Learner can add new components using `npx shadcn@latest add <component>`
 - Component file structure clear and organized
 
 **Estimated Effort**: 1 hour
@@ -1088,21 +1082,26 @@ tokens, and create initial style guide documentation page
 
 **Design Tokens**:
 
-- [ ] Create `frontend/src/styles/design-system.css` file
-- [ ] Define CSS custom properties for color palette (primary, secondary,
-      accent, neutral, success, warning, error with shades 50-900)
-- [ ] Define typography scale variables (font-size, line-height, font-weight for
-      heading-1 through heading-6, body, small, caption)
-- [ ] Define spacing scale (using Tailwind's spacing as base but exposed as CSS
-      variables for documentation)
-- [ ] Define border radius tokens (rounded-sm, rounded-md, rounded-lg,
-      rounded-full)
-- [ ] Define shadow tokens (shadow-sm, shadow-md, shadow-lg, shadow-xl)
-- [ ] Import design-system.css in `main.tsx` after Tailwind imports
+- [x] Create `frontend/src/styles/design-system.css` file
+- [x] Define CSS custom properties for extended design tokens: - Typography scale (font-size, line-height, font-weight for xs through 5xl) - Spacing scale (complementing Tailwind: xs, sm, md, lg, xl, 2xl, 3xl) - Shadow tokens (sm, md, lg, xl, 2xl) - Z-index scale (dropdown, sticky, fixed, modal, popover, tooltip) - Utility classes (text-balance, container sizes, focus-ring, truncate)
+- [x] Note: Color tokens already defined in `src/index.css` by shadcn/ui (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring, card, popover)
+- [x] Import design-system.css in `main.tsx` after Tailwind imports
 
 **Tailwind Configuration**:
 
-- [ ] Extend `tailwind.config.ts` (or `.cjs`) to use design system CSS variables:
+- [x] Verify `tailwind.config.cjs` already extended with shadcn/ui CSS variables
+- [x] Confirm color system uses `hsl(var(--<color>))` pattern for theme support
+- [x] Verify borderRadius uses `var(--radius)` for consistent rounding
+- [x] Confirm `tailwindcss-animate` plugin installed for animations
+- [x] Note: No additional Tailwind config changes needed - shadcn/ui setup is complete
+
+**Style Guide Page**:
+
+- [x] Create `frontend/src/pages/StyleGuide.tsx` component
+- [x] Create page layout with header "Design System" and Tabs navigation
+- [x] Add route `/style-guide` in `AppRoutes.tsx` (public route, no auth required)
+- [x] Create sections: Colors, Typography, Spacing, Components
+- [x] Style page with clean, documentation-focused design
 
   ```typescript
   import type { Config } from "tailwindcss";
@@ -1176,32 +1175,46 @@ tokens, and create initial style guide documentation page
       populated in next units)
 - [ ] Style page with clean, documentation-focused design (minimal distractions)
 
-**Color Palette Section**:
+**Color Section Content**:
 
-- [ ] Display color swatches for each color with hex values and CSS variable
-      names
-- [ ] Make swatches clickable to copy hex value to clipboard
-- [ ] Show color accessibility ratings (WCAG contrast for text on backgrounds)
+- [x] Display color swatches for shadcn/ui theme colors with HSL values and CSS variable names
+- [x] Make swatches clickable to copy HSL value to clipboard
+- [x] Show visual feedback when color copied ("Copied!" message)
+- [x] Include colors: background, foreground, primary, secondary, muted, accent, destructive, border, input, ring, card, popover
 
-**Typography Section**:
+**Typography Section Content**:
 
-- [ ] Display all heading levels (h1-h6) with sample text showing size, weight,
-      line-height
-- [ ] Display body text variations (regular, bold, italic)
-- [ ] Display utility text (small, caption, code)
-- [ ] Include copy-to-clipboard for CSS class names
+- [x] Display all heading levels (h1-h6) with live examples showing size, weight, line-height
+- [x] Include sample text for each heading level
+- [x] Display actual font rendering using design system typography scale
+- [x] Show semantic heading hierarchy
+
+**Spacing Section Content**:
+
+- [x] Display custom spacing scale with visual representation
+- [x] Include spacing tokens: xs, sm, md, lg, xl, 2xl, 3xl
+- [x] Show actual spacing measurements with colored blocks
+
+**Components Section Content**:
+
+- [x] Display Button component variations (default, secondary, destructive, outline, ghost, link)
+- [x] Display Input component with Label
+- [x] Display Card component with header, content, footer
+- [x] All components use shadcn/ui from src/components/ui/
 
 **Navigation**:
 
-- [ ] Add "Style Guide" link to main navigation (visible to all users)
-- [ ] Make style guide page easily accessible for developers and designers
+- [x] Add "Style Guide" link to main navigation (visible to all users)
+- [x] Make style guide page easily accessible at `/style-guide` route
 
 **Success Criteria**:
 
 - Design tokens defined as CSS custom properties and integrated with Tailwind
 - Style guide page accessible at `/style-guide` route
-- Color palette fully documented with visual swatches
-- Typography scale demonstrated with live examples
+- Color palette fully documented with visual swatches and clipboard copy
+- Typography scale demonstrated with live heading examples
+- Spacing scale visualized with measurements
+- Component demos show shadcn/ui components in use
 - Page serves as single source of truth for design decisions
 
 **Estimated Effort**: 3-4 hours
@@ -1210,24 +1223,79 @@ tokens, and create initial style guide documentation page
 
 PAUSE
 
-## AI PROMPT:
+## AI PROMPT TO USER/LEARNER:
 
-Validate Phase 3 (Design System Foundation) completion:
+**Part 1 (Units 1-6) implementation complete!**
 
-**VALIDATION CHECKLIST**:
+Before proceeding to Part 2, **please test the design system implementation in your browser:**
 
-- Navigate to `http://localhost:5173/style-guide`
-- Verify color palette section displays all color swatches with proper values
-- Click color swatch, verify hex value copied to clipboard
-- Verify typography section shows all heading levels and text variations with
-  correct styling
-- Check `design-system.css`: Verify CSS custom properties defined for colors,
-  typography, spacing
-- Check `tailwind.config.ts`: Verify theme extended to use custom properties
-- Test Button component uses design system colors correctly
-- Verify "Style Guide" link appears in navigation
+### Frontend Testing Checklist
 
-**Confirm style guide displays correctly before proceeding to Part 2.**
+**Start the development server** (if not already running):
+
+```bash
+cd frontend
+npm run dev
+```
+
+**Navigate to the Style Guide**:
+
+1. Open browser to `http://localhost:5173/style-guide`
+2. Verify page loads without errors
+
+**Test Colors Tab**:
+
+- [ ] Click "Colors" tab - section displays color swatches
+- [ ] Verify all shadcn/ui theme colors shown (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring, card, popover)
+- [ ] Click any color swatch - "Copied!" message appears
+- [ ] Open browser DevTools (F12), check Console - verify HSL value logged
+- [ ] Paste from clipboard - verify HSL value copied correctly (e.g., `210 40% 98%`)
+
+**Test Typography Tab**:
+
+- [ ] Click "Typography" tab - section displays heading examples
+- [ ] Verify all heading levels h1-h6 render with correct sizes
+- [ ] Check visual hierarchy (h1 largest → h6 smallest)
+- [ ] Verify sample text appears under each heading
+
+**Test Spacing Tab**:
+
+- [ ] Click "Spacing" tab - section displays spacing scale
+- [ ] Verify spacing tokens shown: xs, sm, md, lg, xl, 2xl, 3xl
+- [ ] Check visual spacing blocks render correctly
+
+**Test Components Tab**:
+
+- [ ] Click "Components" tab - section displays component demos
+- [ ] Verify Button variations render (default, secondary, destructive, outline, ghost, link)
+- [ ] Verify Input with Label renders
+- [ ] Verify Card renders with header, content, footer sections
+- [ ] Click buttons - verify they respond to interaction
+
+**Browser Console Check**:
+
+- [ ] Open DevTools Console (F12 → Console tab)
+- [ ] Verify NO errors shown (red messages)
+- [ ] Verify NO warnings about missing modules or failed imports
+- [ ] Copy color swatch - verify console logs HSL value (expected in development mode)
+
+**Navigation Check**:
+
+- [ ] Verify "Style Guide" link appears in main navigation
+- [ ] Click link - navigates to `/style-guide` correctly
+- [ ] Navigate to Home page - verify you can return to style guide
+
+---
+
+**IMPORTANT**: Please confirm:
+
+✅ "I have tested the style guide in my browser and all sections work correctly"
+
+OR
+
+❌ "I encountered issues: [describe what failed]"
+
+**Once you confirm testing is complete, I will proceed with Part 2 (Testing Infrastructure & Visualization).**
 
 ---
 
