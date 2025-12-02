@@ -14,6 +14,7 @@ from .api.error_handlers import (api_error_handler, http_exception_handler,
                                  validation_exception_handler)
 from .api.routes import auth_router
 from .api.routes.analytics import router as analytics_router
+from .api.routes.ideas import router as ideas_router
 from .core.errors import APIError
 from .middleware.request_id import RequestIDTimingMiddleware
 
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     # Register routers
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
+    app.include_router(ideas_router, prefix="/api/v1/ideas", tags=["ideas"])
 
     @app.get("/health")
     async def health(request: Request):

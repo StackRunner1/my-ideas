@@ -27,7 +27,7 @@ export interface TagUsage {
  */
 export async function getItemsByDate(): Promise<ItemsByDate[]> {
   const response = await apiClient.get<ItemsByDate[]>(
-    "/analytics/items-by-date"
+    "/api/v1/analytics/items-by-date"
   );
   return response.data;
 }
@@ -37,7 +37,7 @@ export async function getItemsByDate(): Promise<ItemsByDate[]> {
  */
 export async function getItemsByStatus(): Promise<ItemsByStatus[]> {
   const response = await apiClient.get<ItemsByStatus[]>(
-    "/analytics/items-by-status"
+    "/api/v1/analytics/items-by-status"
   );
   return response.data;
 }
@@ -46,6 +46,8 @@ export async function getItemsByStatus(): Promise<ItemsByStatus[]> {
  * Fetch top 10 most used tags
  */
 export async function getTagsUsage(): Promise<TagUsage[]> {
-  const response = await apiClient.get<TagUsage[]>("/analytics/tags-usage");
+  const response = await apiClient.get<TagUsage[]>(
+    "/api/v1/analytics/tags-usage"
+  );
   return response.data;
 }

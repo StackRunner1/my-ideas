@@ -64,12 +64,26 @@ export function AuthModal({
         password: signInPassword,
       });
 
+      console.log("[AuthModal] Login response:", {
+        user: response.user,
+        expiresAt: response.expiresAt,
+        hasAccessToken: !!response.accessToken,
+        accessTokenPreview: response.accessToken
+          ? response.accessToken.substring(0, 30) + "..."
+          : "MISSING",
+      });
+
       // Set session in Redux
       dispatch(setSession({ expiresAt: response.expiresAt }));
 
-      // Store token in memory (though backend uses cookies primarily)
-      // This is optional since we rely on httpOnly cookies
-      setAuthToken(null); // We don't have access token in response, cookies handle it
+      // Store access token for Authorization header
+      // Token is returned in response AND set in httpOnly cookies
+      if (response.accessToken) {
+        console.log("[AuthModal] Storing access token in memory");
+        setAuthToken(response.accessToken);
+      } else {
+        console.error("[AuthModal] ❌ NO ACCESS TOKEN in login response!");
+      }
 
       // Fetch user profile
       dispatch(fetchUserProfile());
@@ -121,8 +135,10 @@ export function AuthModal({
       // Set session in Redux
       dispatch(setSession({ expiresAt: response.expiresAt }));
 
-      // Store token in memory
-      setAuthToken(null); // Cookies handle authentication
+      // Store access token for Authorization header
+      if (response.accessToken) {
+        setAuthToken(response.accessToken);
+      }
 
       // Fetch user profile
       dispatch(fetchUserProfile());

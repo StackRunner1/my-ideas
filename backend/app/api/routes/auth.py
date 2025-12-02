@@ -53,6 +53,11 @@ class AuthResponse(BaseModel):
     expires_at: int = Field(
         ..., alias="expiresAt", description="Token expiry timestamp (epoch ms)"
     )
+    access_token: str = Field(
+        ...,
+        alias="accessToken",
+        description="JWT access token for Authorization header",
+    )
 
     class Config:
         populate_by_name = True
@@ -144,9 +149,11 @@ async def signup(credentials: SignupRequest, response: Response):
         # Step 6: Set httpOnly cookies
         _set_auth_cookies(response, access_token, refresh_token, expires_in)
 
-        # Step 7: Return user data
+        # Step 7: Return user data with access token
         return AuthResponse(
-            user={"id": user_id, "email": user.email}, expiresAt=expires_at
+            user={"id": user_id, "email": user.email},
+            expiresAt=expires_at,
+            accessToken=access_token,
         )
 
     except HTTPException:
@@ -205,8 +212,14 @@ async def login(credentials: LoginRequest, response: Response):
         # Set cookies
         _set_auth_cookies(response, access_token, refresh_token, expires_in)
 
+        print(f"[AUTH] Login successful for user {user.id}")
+        print(f"[AUTH] Returning accessToken: {access_token[:30]}...")
+        print(f"[AUTH] Cookies set: access_token, refresh_token")
+
         return AuthResponse(
-            user={"id": user.id, "email": user.email}, expiresAt=expires_at
+            user={"id": user.id, "email": user.email},
+            expiresAt=expires_at,
+            accessToken=access_token,
         )
 
     except HTTPException:

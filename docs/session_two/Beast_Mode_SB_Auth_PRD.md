@@ -9,7 +9,7 @@ RLS-enforced endpoints.
 
 ## Business Context
 
-- **Problem**: Modern web applications require secure, scalable authentication with minimal custom infrastructure, PLUS AI agents need secure database access 
+- **Problem**: Modern web applications require secure, scalable authentication with minimal custom infrastructure, PLUS AI agents need secure database access
 - **Solution**: Standard Supabase Auth integration with httpOnly cookie-based session management, automatic token refresh, and RLS-enforced data access. Agent-users leverage the same auth flow for autonomous operations.
 - **Value**: Production-ready authentication with industry best practices, reduced development time, built-in security features, and secure AI agent access
 
@@ -25,12 +25,11 @@ This PRD documents the complete authentication architecture including:
 6. **Integration Points**: RLS enforcement, user profile management, cross-service authentication
 
 ## AI Coding Agent (Hithub CoPilot or similar) Instructions
+
 **IMPORTANT**: In this PRD document, prompts aimed at the AI coding assistant to strat or continue the implementaiton of this PRD end-to-end (in cinjunction with the learner and via the Github Copilot Chat) will be marked with `## AI PROMPT` headings.
+
 - **The learner** pastes the prompt into the chat to initiate the start or the coninuation of the code implementation led by the ai coding assistant.
 - **AI Coding Assistant** reads and executes on the prompt IF not provided by the learner. The AI Coding Assistant should execute the tasks specified uner each unit and - upon completion - mark off each task with [x] = completed or [~] = in progress depending on status. Sections (---) marked with "PAUSE" are milestone points where the AI Coding Assistant should check in with the learner, ensure all checklists in this PRD reflect the latest progress, and await the next learner instructions OR - after approval - move to readin the next `## AI PROMPT` and start execution.
-
-
-
 
 ## Prerequisites: Environment Setup (Before Unit 1)
 
@@ -378,6 +377,15 @@ backend/
 
 ### Frontend Structure (After Completion)
 
+**⚠️ CRITICAL**: Only ONE apiClient.ts file should exist in the entire frontend codebase:
+
+- ✅ `frontend/src/lib/apiClient.ts` - The ONLY configured axios instance
+- ❌ DO NOT create `frontend/src/api/apiClient.ts` or any other apiClient file
+- ✅ All imports MUST use the @ alias: `import apiClient from "@/lib/apiClient"`
+- ❌ NEVER use relative imports: `import apiClient from "./apiClient"` or `import apiClient from "../lib/apiClient"`
+
+**Why this matters**: Multiple apiClient files cause auth failures. Service files importing the wrong apiClient will send requests WITHOUT authentication headers or cookies, resulting in 401 errors that are difficult to debug.
+
 ```
 frontend/
 ├── src/
@@ -388,6 +396,7 @@ frontend/
 │   │
 │   ├── lib/
 │   │   └── apiClient.ts             # Axios instance with auto-refresh, httpOnly cookies (Unit 9)
+│   │                                # ⚠️ THE ONLY apiClient.ts in the project!
 │   │
 │   ├── store/
 │   │   ├── index.ts                 # Redux store configuration (Unit 10)
@@ -497,11 +506,13 @@ frontend/
 ---
 
 ## AI PROMPT:
-Initial Engagement Prompt: 
+
+Initial Engagement Prompt:
 
 I need you to implement the Supabase Authentication PRD (Beast_Mode_SB_Auth_PRD.md) end-to-end.
 
 EXECUTION REQUIREMENTS:
+
 - Follow the unit sequence exactly as documented (Units 1-17)
 - Mark deliverables as [x] in the PRD as you complete them
 - Ask for my approval before proceeding to each new unit OR at key milestones preceeded with sections 'PAUSE'
@@ -509,6 +520,7 @@ EXECUTION REQUIREMENTS:
 - Flag any missing dependencies or unclear requirements immediately
 
 TECHNICAL CONSTRAINTS:
+
 - Backend: Python 3.12+, FastAPI, Supabase Python SDK
 - Frontend: React 18.2, TypeScript, Vite, Redux Toolkit, shadcn/ui
 - Auth: Standard Supabase Auth (no custom JWT logic)
@@ -516,6 +528,7 @@ TECHNICAL CONSTRAINTS:
 - State: Redux for UI auth state, cookies for backend auth
 
 START WITH:
+
 - Unit 1: Supabase Client Setup
 - Confirm you understand the agent-user pattern before implementing Unit 8
 - Verify Supabase email confirmation is disabled before testing signup
@@ -585,6 +598,10 @@ user tokens from requests
 - [x] Configure `secure=True` for production, `secure=False` for local/dev
 - [x] Configure `samesite="none"` for production (cross-origin),
       `samesite="lax"` for local
+- [x] **CRITICAL**: DO NOT set `domain` key in development cookie config
+  - Without domain restriction, cookies work on both localhost AND 127.0.0.1
+  - Setting `domain="localhost"` breaks requests to 127.0.0.1
+  - Production can set domain explicitly if needed
 - [x] Implement `_set_auth_cookies(response, access_token, refresh_token, ...)`
       helper
 - [x] Set httpOnly cookies with appropriate max-age from token expiry
@@ -662,6 +679,8 @@ user AND agent-user (two separate Supabase auth accounts)
 - [x] Define `SignupRequest` Pydantic model with `email` and `password` fields
 - [x] Add password validation (min 8 chars, complexity rules optional)
 - [x] Define `AuthResponse` Pydantic model with camelCase serialization
+  - [x] **CRITICAL**: Include `accessToken: str` field (with Field alias for camelCase)
+  - This enables dual auth strategy: cookies (primary) + Authorization header (fallback)
 - [x] Implement `POST /auth/signup` endpoint:
   - [x] **Step 1**: Call Supabase
         `auth.sign_up(email=user_email, password=user_password)` via admin
@@ -680,7 +699,17 @@ user AND agent-user (two separate Supabase auth accounts)
   - [x] **Step 5**: Calculate `expiresAt` timestamp (now + expires_in)
   - [x] **Step 6**: Call `_set_auth_cookies()` to store user tokens in httpOnly
         cookies
-- [x] Return user data: `{"user": {"id": ..., "email": ...}, "expiresAt": ...}`
+- [x] **Step 7**: Return AuthResponse with accessToken in body:
+  ```python
+  return AuthResponse(
+      user={"id": user_id, "email": user_email},
+      expiresAt=expires_at,
+      accessToken=access_token  # ← CRITICAL for dual auth strategy
+  )
+  ```
+- [x] **Defense in Depth**: Tokens sent via BOTH cookies (httpOnly, secure) AND response body
+  - Cookies: Primary auth mechanism, automatic, secure
+  - Response token: Fallback for Authorization header, manual management
 - [x] Handle duplicate email error (400)
 - [x] Handle Supabase API errors (500)
 - [x] Add logging for successful signups (user AND agent creation)
@@ -713,7 +742,14 @@ user AND agent-user (two separate Supabase auth accounts)
 - [x] Call Supabase `auth.sign_in_with_password(email=..., password=...)`
 - [x] Extract tokens and expiry from response
 - [x] Set httpOnly cookies using `_set_auth_cookies()`
-- [x] Return `AuthResponse` with user and expiresAt
+- [x] **CRITICAL**: Return `AuthResponse` with user, expiresAt, AND accessToken:
+  ```python
+  return AuthResponse(
+      user={"id": user_id, "email": user_email},
+      expiresAt=expires_at,
+      accessToken=access_token  # ← Must return for frontend to store
+  )
+  ```
 - [x] Handle invalid credentials (401)
 - [x] Handle account locked/disabled errors (403)
 - [x] Add logging for login attempts (success and failure)
@@ -860,6 +896,7 @@ standard Supabase auth and RLS
 **Estimated Effort**: 3-4 hours
 
 ---
+
 PAUSE
 
 ## AI PROMPT:
@@ -867,6 +904,7 @@ PAUSE
 Run the validation checks below.
 
 VALIDATION CHECKLIST:
+
 - Start backend: python -m uvicorn app.main:app --reload
 - Test signup: curl -X POST http://localhost:8000/api/v1/auth/signup -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"testpass123"}'
 - Verify two users created in Supabase Studio (user + agent_user)
@@ -895,14 +933,43 @@ support
 - [x] Create `frontend/src/lib/apiClient.ts` module
 - [x] Configure base URL from environment: `VITE_API_BASE_URL` (default:
       `http://localhost:8000/api/v1`)
+- [x] **CRITICAL FILE LOCATION**: Create ONLY in `frontend/src/lib/apiClient.ts`
+  - ❌ DO NOT create `frontend/src/api/apiClient.ts` (common mistake!)
+  - This file must be imported using @ alias: `import apiClient from "@/lib/apiClient"`
+  - Any other apiClient.ts file will cause auth failures
 - [x] Create Axios instance with `withCredentials: true` for cookie support
 - [x] Set default timeout (30 seconds)
 - [x] Add sanity check warning if base URL lacks version segment
 - [x] Implement in-memory token storage: `inMemoryToken` variable
 - [x] Export `setAuthToken(token)` function to update in-memory token
+- [x] **Add debug logging** to setAuthToken for troubleshooting:
+  ```typescript
+  console.log(
+    `[API Client] setAuthToken called with: ${
+      token ? token.substring(0, 20) + "..." : "null"
+    }`
+  );
+  ```
 - [x] Export `setAllowAutoRefresh(allow)` function to toggle refresh behavior
 - [x] Implement request interceptor:
   - [x] Add `Authorization: Bearer <token>` header if in-memory token exists
+  - [x] **Add debug logging** for troubleshooting:
+    ```typescript
+    if (inMemoryToken && config.headers) {
+      config.headers.Authorization = `Bearer ${inMemoryToken}`;
+      console.log(
+        `[API Client] ✅ Added Authorization header for ${config.method?.toUpperCase()} ${
+          config.url
+        }`
+      );
+    } else {
+      console.warn(
+        `[API Client] ⚠️ NO TOKEN available for ${config.method?.toUpperCase()} ${
+          config.url
+        }`
+      );
+    }
+    ```
   - [x] Never read token from localStorage (security)
 - [x] Implement response interceptor for 401 errors:
   - [x] Track refresh state to coalesce multiple 401s into single refresh
@@ -1122,7 +1189,10 @@ management
 - [x] Implement sign-in handler:
   - [x] Call `authService.login(credentials)`
   - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth, not in-memory tokens)
+  - [x] **CRITICAL**: Store accessToken in memory via `setAuthToken(response.accessToken)`
+    - Backend returns accessToken in response body (dual auth strategy)
+    - Must call setAuthToken() to enable Authorization header fallback
+    - Add debug logging: `console.log('[AuthModal] Storing access token')`
   - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk to load user data
   - [x] Close modal on success
   - [x] Display error on failure
@@ -1133,7 +1203,9 @@ management
   - [x] Validate terms acceptance
   - [x] Call `authService.signup(credentials)`
   - [x] **CRITICAL**: Dispatch `setSession({ expiresAt })` to Redux - sets `isAuthenticated: true`
-  - [x] Set token in memory via `setAuthToken(null)` (cookies handle auth)
+  - [x] **CRITICAL**: Store accessToken via `setAuthToken(response.accessToken)`
+    - Required for Authorization header to work
+    - Add debug logging for troubleshooting
   - [x] **CRITICAL**: Dispatch `fetchUserProfile()` thunk
   - [x] Close modal on success
   - [x] Display error (e.g., "Email already exists")
@@ -1153,12 +1225,15 @@ management
 **Testing & Validation (After Unit 12)**:
 
 ---
+
 PAUSE
 
 ## AI PROMPT:
+
 The Auth components are created, run these validation checks.
 
 VALIDATION:
+
 - Run npm run dev
 - Verify AuthModal renders with sign-in/sign-up tabs
 - Test form validation (password match, min length, terms checkbox)
@@ -1503,11 +1578,15 @@ export const PATHS = {
 **Estimated Effort**: 2-3 hours
 
 ---
+
 PAUSE
+
 ## AI PROMPT:
+
 Navigation and logout is implemented.RUn critical end-to-end test and explain to me the outcomes and findings:
 
 FULL AUTH FLOW TEST:
+
 1. Clear cookies in browser DevTools
 2. Visit http://localhost:5173
 3. Verify PublicLayout with "Sign In" button
@@ -1770,30 +1849,75 @@ Secrets manager or encrypted config:
 
 ### Debugging Prompts
 
+#### If 401 Errors on Protected Routes (Critical!):
+
+**Symptom**: Login works, but accessing protected routes (e.g., /ideas) returns 401 Unauthorized.
+
+**Root Cause Analysis**:
+
+1. **Check backend logs**: Do they show "NO TOKEN found in cookies or Authorization header"?
+2. **Check browser Network tab**: Does the failed request show:
+   - Cookie header present? (Should have access_token)
+   - Authorization header present? (Should have Bearer token)
+3. **If BOTH missing**, likely causes:
+   - Wrong apiClient being used (multiple apiClient.ts files!)
+   - Request interceptor not running (import path issue)
+   - Token not stored after login (setAuthToken not called)
+
+**Diagnostic Steps**:
+
+```bash
+# 1. Search for multiple apiClient files (CRITICAL!)
+find frontend/src -name "apiClient.ts"
+# Expected: Only frontend/src/lib/apiClient.ts
+# If multiple found: DELETE all except lib/apiClient.ts
+
+# 2. Check imports in service files
+grep -r "import.*apiClient" frontend/src/api/
+grep -r "import.*apiClient" frontend/src/services/
+# All should use: import apiClient from "@/lib/apiClient"
+# NOT: import apiClient from "./apiClient" or "../lib/apiClient"
+
+# 3. Verify token storage in AuthModal
+grep -A 5 "setAuthToken" frontend/src/components/AuthModal.tsx
+# Should call: setAuthToken(response.accessToken)
+```
+
+**Fix Priority**:
+
+1. ✅ Ensure ONLY ONE apiClient.ts exists (in lib/)
+2. ✅ All imports use @ alias: `import apiClient from "@/lib/apiClient"`
+3. ✅ AuthModal calls setAuthToken(response.accessToken) after login/signup
+4. ✅ Backend returns accessToken in AuthResponse
+5. ✅ Cookie config has NO domain key in development
+
 #### If Auth State Not Updating:
+
 Navigation not changing after login. Debug checklist:
 
 1. Check Redux DevTools: Is isAuthenticated true after login?
-2. Check Network tab: Does /auth/login return 200 with expiresAt?
+2. Check Network tab: Does /auth/login return 200 with expiresAt AND accessToken?
 3. Check Application tab: Are cookies set (access_token, refresh_token)?
 4. Check AuthModal handlers: Are setSession() and fetchUserProfile() dispatched?
 5. Check Navigation component: Is useAppSelector reading isAuthenticated?
 6. Check console: Any errors in Redux state updates?
+7. **NEW**: Check console for "[AuthModal] Storing access token" log
+8. **NEW**: Check console for "[API Client] setAuthToken called" log
 
 Report findings for each check.
 
 #### If Cookies Not Set:
+
 Cookies not appearing after login. Verify:
 
-1. Backend auth.py: Does /auth/login call _set_auth_cookies()?
+1. Backend auth.py: Does /auth/login call \_set_auth_cookies()?
 2. Backend response: Are Set-Cookie headers present in response?
 3. Frontend apiClient: Is withCredentials: true set?
 4. CORS settings: Is credentials allowed in backend CORS config?
 5. Domain mismatch: Are frontend (localhost:5173) and backend (localhost:8000) both localhost?
+6. **NEW**: Backend \_cookie_config(): Does it omit the 'domain' key in development?
 
 Show me the relevant code sections.
-
-
 
 ### Adding a New Protected Backend Endpoint
 

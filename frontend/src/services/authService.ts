@@ -24,6 +24,7 @@ export interface AuthResponse {
     email: string;
   };
   expiresAt: number; // Epoch milliseconds
+  accessToken: string; // JWT token for Authorization header
 }
 
 export interface UserData {
@@ -47,7 +48,7 @@ export async function signup(
 ): Promise<AuthResponse> {
   try {
     const response = await apiClient.post<AuthResponse>(
-      "/auth/signup",
+      "/api/v1/auth/signup",
       credentials
     );
     return response.data;
@@ -69,7 +70,7 @@ export async function login(
 ): Promise<AuthResponse> {
   try {
     const response = await apiClient.post<AuthResponse>(
-      "/auth/login",
+      "/api/v1/auth/login",
       credentials
     );
     return response.data;
@@ -88,7 +89,9 @@ export async function login(
  */
 export async function logout(): Promise<{ message: string }> {
   try {
-    const response = await apiClient.post<{ message: string }>("/auth/logout");
+    const response = await apiClient.post<{ message: string }>(
+      "/api/v1/auth/logout"
+    );
     return response.data;
   } catch (error: any) {
     // Even if backend fails, we should clear local state
@@ -107,7 +110,7 @@ export async function logout(): Promise<{ message: string }> {
 export async function refreshSession(): Promise<{ expiresAt: number }> {
   try {
     const response = await apiClient.post<{ expiresAt: number }>(
-      "/auth/refresh"
+      "/api/v1/auth/refresh"
     );
     return response.data;
   } catch (error: any) {
@@ -124,7 +127,7 @@ export async function refreshSession(): Promise<{ expiresAt: number }> {
  */
 export async function checkAuthStatus(): Promise<UserData | null> {
   try {
-    const response = await apiClient.get<UserData>("/auth/me");
+    const response = await apiClient.get<UserData>("/api/v1/auth/me");
     return response.data;
   } catch (error: any) {
     // 401 is expected if not authenticated
@@ -143,7 +146,7 @@ export async function checkAuthStatus(): Promise<UserData | null> {
  */
 export async function getUserProfile(): Promise<any> {
   try {
-    const response = await apiClient.get("/auth/me/profile");
+    const response = await apiClient.get("/api/v1/auth/me/profile");
     return response.data;
   } catch (error: any) {
     const message = error.response?.data?.detail || "Failed to fetch profile";

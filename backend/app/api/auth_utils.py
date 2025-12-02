@@ -25,15 +25,25 @@ def _cookie_config() -> Dict[str, Any]:
         - secure: True for production, False for local/dev
         - samesite: "none" for production (cross-origin), "lax" for local
         - httponly: Always True (prevents JavaScript access)
+        - domain: NOT SET in development (allows localhost AND 127.0.0.1)
+
+    CRITICAL: Omitting 'domain' in development allows cookies to work on both
+    localhost and 127.0.0.1 without restriction.
     """
     is_production = settings.env.lower() == "production"
 
-    return {
-        "httponly": True,
-        "secure": is_production,
-        "samesite": "none" if is_production else "lax",
-        "path": "/",
+    config = {
+        "httponly": True,  # Prevents JavaScript access (XSS protection)
+        "secure": is_production,  # HTTPS-only in production
+        "samesite": "none" if is_production else "lax",  # CSRF protection
+        "path": "/",  # Cookie available for all paths
     }
+
+    # IMPORTANT: Don't set 'domain' in development
+    # Omitting it allows cookies to work on localhost AND 127.0.0.1
+    # In production, you would set: config["domain"] = ".yourdomain.com"
+
+    return config
 
 
 def _set_auth_cookies(
@@ -79,13 +89,19 @@ def _extract_token_from_request(request: Request) -> Optional[str]:
     # Priority 1: Check cookie
     token = request.cookies.get("access_token")
     if token:
+        print(f"[AUTH] ✅ Found token in cookie: {token[:30]}...")
         return token
 
     # Priority 2: Check Authorization header
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        return auth_header.replace("Bearer ", "")
+        token = auth_header.replace("Bearer ", "")
+        print(f"[AUTH] ✅ Found token in Authorization header: {token[:30]}...")
+        return token
 
+    print("[AUTH] ❌ NO TOKEN found in cookies or Authorization header")
+    print(f"[AUTH] Available cookies: {list(request.cookies.keys())}")
+    print(f"[AUTH] Authorization header: {auth_header}")
     return None
 
 
@@ -112,9 +128,11 @@ async def get_current_user(request: Request, response: Response) -> Dict[str, An
             user_id = current_user["user"]["id"]
             return {"message": f"Hello {user_id}"}
     """
+    print(f"[AUTH] get_current_user called for {request.method} {request.url.path}")
     access_token = _extract_token_from_request(request)
 
     if not access_token:
+        print("[AUTH] ❌ Authentication failed: No token provided")
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:

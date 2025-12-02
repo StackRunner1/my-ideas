@@ -1895,8 +1895,7 @@ demonstrations and interactive customization
 **Button Component Section**:
 
 - [ ] Create "shadcn/ui Components" section in style guide
-- [ ] Display all Button variants: default, destructive, outline, secondary,
-      ghost, link
+- [ ] Display all Button variants: default, destructive, outline, secondary, ghost, link
 - [ ] Display all Button sizes: default, sm, lg, icon
 - [ ] Show Button states: default, hover, active, disabled, loading
 - [ ] Add interactive controls to switch variants and sizes
@@ -1991,24 +1990,19 @@ Validate Phase 5 (Interactive Style Guide) completion:
 **VALIDATION CHECKLIST**:
 
 - Navigate to `http://localhost:5173/style-guide`
-- Verify "Native HTML" section shows all heading levels, text elements, form
-  controls
-- Test interactive controls: change font size, verify elements update in
-  real-time
+- Verify "Native HTML" section shows all heading levels, text elements, form controls
+- Test interactive controls: change font size, verify elements update in real-time
 - Test "Copy Code" buttons: verify HTML snippets copy correctly
 - Verify "shadcn/ui Components" section displays all installed components
 - Test Button variants: click through all variants and sizes, verify rendering
 - Test Dialog component: click trigger, verify modal opens with focus trap
 - Test Toast demo: click button, verify toast appears with correct styling
 - Test component playground: modify props via controls, verify preview updates
-- Test theme switcher (if implemented): toggle light/dark, verify CSS variables
-  change
+- Test theme switcher (if implemented): toggle light/dark, verify CSS variables change
 - Verify all code examples have syntax highlighting
-- Check accessibility: keyboard navigate through interactive elements, verify
-  focus visible
+- Check accessibility: keyboard navigate through interactive elements, verify focus visible
 
-**Confirm style guide is comprehensive and interactive before proceeding to
-Phase 6 (Visualization).**
+**Confirm style guide is comprehensive and interactive before proceeding to Phase 6 (Visualization).**
 
 ---
 

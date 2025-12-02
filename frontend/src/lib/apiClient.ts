@@ -31,8 +31,7 @@ function generateUUID(): string {
 }
 
 // Configuration
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const TIMEOUT = 30000; // 30 seconds
 const REFRESH_COOLDOWN_MS = 5000; // 5 seconds
 const MAX_RETRIES = 2; // Maximum retry attempts for 5xx errors
@@ -56,10 +55,11 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // Sanity check for base URL
-if (!BASE_URL.includes("/api/v") && !BASE_URL.includes("/v")) {
+if (BASE_URL.includes("/api")) {
   console.warn(
-    "[API Client] Base URL does not contain version segment (e.g., /api/v1). " +
-      "Ensure VITE_API_BASE_URL is correctly configured."
+    "[API Client] Base URL should NOT include /api prefix. " +
+      "API prefix is defined in backend main.py. " +
+      "Set VITE_API_URL=http://localhost:8000"
   );
 }
 
@@ -70,7 +70,15 @@ if (!BASE_URL.includes("/api/v") && !BASE_URL.includes("/v")) {
  * @param token - JWT token or null to clear
  */
 export function setAuthToken(token: string | null): void {
+  console.log(
+    "[API Client] setAuthToken called with:",
+    token ? `${token.substring(0, 20)}...` : "null"
+  );
   inMemoryToken = token;
+  console.log(
+    "[API Client] inMemoryToken is now:",
+    inMemoryToken ? `${inMemoryToken.substring(0, 20)}...` : "null"
+  );
 }
 
 /**
@@ -106,6 +114,20 @@ apiClient.interceptors.request.use(
     // Add Authorization header if token exists
     if (inMemoryToken && config.headers) {
       config.headers.Authorization = `Bearer ${inMemoryToken}`;
+      console.log(
+        `[API Client] ✅ Added Authorization header for ${config.method?.toUpperCase()} ${
+          config.url
+        }`
+      );
+      console.log(`[API Client] Token: ${inMemoryToken.substring(0, 30)}...`);
+    } else {
+      console.warn(
+        `[API Client] ⚠️ NO TOKEN for ${config.method?.toUpperCase()} ${
+          config.url
+        }`
+      );
+      console.log(`[API Client] inMemoryToken is:`, inMemoryToken);
+      console.log(`[API Client] cookies:`, document.cookie);
     }
     return config;
   },
