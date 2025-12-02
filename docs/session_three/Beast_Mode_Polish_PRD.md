@@ -1429,6 +1429,21 @@ fixtures, and async testing support
 
 **Deliverables**:
 
+**Pytest Installation**:
+
+- [ ] Install testing dependencies:
+  ```bash
+  pip install pytest pytest-asyncio httpx pytest-cov
+  ```
+- [ ] Add testing dependencies to `backend/requirements.txt`:
+  ```
+  pytest
+  pytest-asyncio
+  httpx
+  pytest-cov
+  coverage
+  ```
+
 **Pytest Configuration**:
 
 - [ ] Create or update `backend/pytest.ini` with the following configuration:
@@ -1579,10 +1594,22 @@ Testing Library for component and integration testing
 
 **Vitest Installation**:
 
-- [ ] Install testing dependencies:
+- [ ] **AI ASSISTANT**: Provide this install command to the user:
   ```bash
-  npm install -D vitest@1.2.0 @testing-library/react@14.1.2 @testing-library/jest-dom@6.1.5 @testing-library/user-event@14.5.1 jsdom@24.0.0 @vitest/ui@1.2.0
+  npm install --save-dev vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event @vitest/ui jsdom
   ```
+- [ ] **AI ASSISTANT**: Prompt user to run the command in the `/frontend` terminal and confirm when complete
+- [ ] **AI ASSISTANT**: After user confirmation, add test scripts to `package.json`:
+  ```json
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  }
+  ```
+
+**Vitest Configuration**:
+
 - [ ] Create `frontend/vitest.config.ts` with the following configuration:
 
   ```typescript
