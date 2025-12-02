@@ -1,5 +1,7 @@
 # Production Reliability & Design Systems - Product Requirements Document v1.0
 
+> **📌 SOURCE OF TRUTH**: This is the AUTHORITATIVE version of the Session 3 PRD, updated throughout implementation with all improvements, bug fixes, and lessons learned. See `README.md` in this directory for version history.
+
 ## Overview
 
 Comprehensive documentation for **Session 3: Production Polish & Developer
@@ -1085,7 +1087,22 @@ tokens, and create initial style guide documentation page
 - [x] Create `frontend/src/styles/design-system.css` file
 - [x] Define CSS custom properties for extended design tokens: - Typography scale (font-size, line-height, font-weight for xs through 5xl) - Spacing scale (complementing Tailwind: xs, sm, md, lg, xl, 2xl, 3xl) - Shadow tokens (sm, md, lg, xl, 2xl) - Z-index scale (dropdown, sticky, fixed, modal, popover, tooltip) - Utility classes (text-balance, container sizes, focus-ring, truncate)
 - [x] Note: Color tokens already defined in `src/index.css` by shadcn/ui (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring, card, popover)
-- [x] Import design-system.css in `main.tsx` after Tailwind imports
+- [x] Import design-system.css **inside** `index.css` using `@import './styles/design-system.css';` (not in main.tsx)
+- [x] **IMPORTANT**: The import must be in `index.css` after `@tailwind` directives so PostCSS processes it correctly. Importing in `main.tsx` causes `@layer base` error because the file is processed separately without access to Tailwind's layer definitions.
+
+**CSS Import Pattern** (in `src/index.css`):
+
+```css
+@import "./styles/design-system.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rest of your CSS */
+```
+
+**Note**: `@import` must come **BEFORE** `@tailwind` directives per CSS specification.
 
 **Tailwind Configuration**:
 
@@ -1206,6 +1223,8 @@ tokens, and create initial style guide documentation page
 
 - [x] Add "Style Guide" link to main navigation (visible to all users)
 - [x] Make style guide page easily accessible at `/style-guide` route
+- [x] Add "View Style Guide" button to Home page for easy testing access
+- [x] Add "Back to Home" button on Style Guide page for easy navigation during testing
 
 **Success Criteria**:
 

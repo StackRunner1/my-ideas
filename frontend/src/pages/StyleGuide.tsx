@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 export default function StyleGuide() {
+  const navigate = useNavigate();
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, label: string) => {
@@ -63,12 +65,17 @@ export default function StyleGuide() {
   ];
 
   return (
-    <div className="container-xl py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Design System</h1>
-        <p className="text-muted-foreground text-lg">
-          Interactive documentation for the my-ideas design system
-        </p>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">Design System</h1>
+          <p className="text-muted-foreground text-lg">
+            Interactive documentation for the my-ideas design system
+          </p>
+        </div>
+        <Button onClick={() => navigate("/")} variant="outline">
+          Back to Home
+        </Button>
       </div>
 
       <Tabs defaultValue="colors" className="w-full">

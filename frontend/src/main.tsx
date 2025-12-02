@@ -6,7 +6,6 @@ import { Provider as ReduxProvider } from "react-redux";
 import { store } from "./store";
 import { AppRoutes } from "./routes/AppRoutes";
 import "./index.css";
-import "./styles/design-system.css";
 
 const queryClient = new QueryClient();
 

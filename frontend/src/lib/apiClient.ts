@@ -122,7 +122,9 @@ apiClient.interceptors.response.use(
     const requestId = response.headers["x-request-id"];
     const duration = response.headers["x-duration-ms"];
     logger.debug(
-      `API Response: ${response.config.method?.toUpperCase()} ${response.config.url} → ${response.status}`,
+      `API Response: ${response.config.method?.toUpperCase()} ${
+        response.config.url
+      } → ${response.status}`,
       {
         requestId,
         status: response.status,
@@ -210,7 +212,9 @@ apiClient.interceptors.response.use(
       if (now - lastRefreshTime < REFRESH_COOLDOWN_MS) {
         logger.warn("Refresh cooldown active, rejecting request");
         return Promise.reject(error);
-      }/ Mark this specific request as retried to prevent infinite retry loops
+      }
+
+      // Mark this specific request as retried to prevent infinite retry loops
       originalRequest._retry = true;
 
       // Coalesce multiple refresh attempts into a single refresh call
@@ -255,7 +259,10 @@ apiClient.interceptors.response.use(
           // But for httpOnly cookie strategy, this isn't necessary
         } catch (refreshError) {
           logger.error("Token refresh failed", {
-            error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+            error:
+              refreshError instanceof Error
+                ? refreshError.message
+                : String(refreshError),
           });
 
           // Clear in-memory token on refresh failure
@@ -269,7 +276,8 @@ apiClient.interceptors.response.use(
           isRefreshing = false;
           refreshPromise = null;
         }
-      })(); refreshPromise;
+      })();
+      refreshPromise;
 
       // Retry original request with new token
       return apiClient(originalRequest);

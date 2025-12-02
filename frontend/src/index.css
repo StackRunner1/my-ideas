@@ -1,3 +1,5 @@
+@import "./styles/design-system.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,8 +7,6 @@
 body {
   font-family: system-ui, sans-serif;
 }
-
-
 
 @layer base {
   :root {
@@ -63,8 +63,6 @@ body {
     --chart-5: 340 75% 55%;
   }
 }
-
-
 
 @layer base {
   * {
