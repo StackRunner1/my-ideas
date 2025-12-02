@@ -13,6 +13,7 @@ import Dashboard from "@/pages/Dashboard";
 import Ideas from "@/pages/Ideas";
 import Profile from "@/pages/Profile";
 import StyleGuide from "@/pages/StyleGuide";
+import Analytics from "@/pages/Analytics";
 
 /**
  * AppRoutes Component
@@ -93,6 +94,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
             </ProtectedRoute>
           }
         />

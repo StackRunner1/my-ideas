@@ -110,6 +110,9 @@ export function Navigation() {
                 <Link to={PATHS.IDEAS} className="text-sm hover:underline">
                   Ideas
                 </Link>
+                <Link to="/analytics" className="text-sm hover:underline">
+                  Analytics
+                </Link>
               </>
             ) : (
               <Link to={PATHS.ABOUT} className="text-sm hover:underline">

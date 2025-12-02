@@ -2039,46 +2039,48 @@ dashboard showing items and tags data with charts
 
 - [ ] Open Supabase Dashboard → SQL Editor and create the following views:
 
-- [ ] Create view `items_by_date` aggregating item count by creation date (last 30 days):
+- [ ] Create view `items_by_date` aggregating idea count by creation date (last 30 days):
 
   ```sql
   CREATE OR REPLACE VIEW items_by_date AS
   SELECT
     DATE(created_at) as date,
     COUNT(*) as count
-  FROM items
+  FROM ideas
   WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
   GROUP BY DATE(created_at)
   ORDER BY date DESC;
   ```
 
-- [ ] Create view `items_by_status` aggregating item count by status:
+- [ ] Create view `items_by_status` aggregating idea count by status:
 
   ```sql
   CREATE OR REPLACE VIEW items_by_status AS
   SELECT
     status,
     COUNT(*) as count
-  FROM items
+  FROM ideas
   GROUP BY status
   ORDER BY count DESC;
   ```
 
-- [ ] Create view `tags_usage` aggregating tag count by label (top 10 most used tags):
+- [ ] Create view `tags_usage` aggregating tag usage from ideas.tags array (top 10 most used tags):
 
   ```sql
   CREATE OR REPLACE VIEW tags_usage AS
   SELECT
-    t.label,
-    COUNT(it.item_id) as usage_count
-  FROM tags t
-  LEFT JOIN item_tags it ON t.id = it.tag_id
-  GROUP BY t.id, t.label
+    unnest(tags) as label,
+    COUNT(*) as usage_count
+  FROM ideas
+  WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+  GROUP BY unnest(tags)
   ORDER BY usage_count DESC
   LIMIT 10;
   ```
 
-- [ ] Create view `user_activity` aggregating user actions over time (items created per day):
+  Note: This uses PostgreSQL's `unnest()` to extract individual tags from the `ideas.tags` TEXT[] array column.
+
+- [ ] Create view `user_activity` aggregating user actions over time (ideas created per day):
 
   ```sql
   CREATE OR REPLACE VIEW user_activity AS
@@ -2086,7 +2088,7 @@ dashboard showing items and tags data with charts
     DATE(created_at) as activity_date,
     user_id,
     COUNT(*) as items_created
-  FROM items
+  FROM ideas
   WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'
   GROUP BY DATE(created_at), user_id
   ORDER BY activity_date DESC, user_id;
@@ -2101,7 +2103,7 @@ dashboard showing items and tags data with charts
   SELECT * FROM user_activity WHERE user_id = 'YOUR_TEST_USER_ID' LIMIT 10;
   ```
 
-- [ ] **Important**: Ensure RLS policies are applied to views if accessing via API (views inherit permissions from underlying tables)
+- [ ] **Important**: Ensure RLS policies are applied to views if accessing via API (views inherit permissions from underlying `ideas` table)
 
 **Backend Analytics Endpoints**:
 
@@ -2132,6 +2134,7 @@ dashboard showing items and tags data with charts
 - [ ] Add route `/analytics` in `AppRoutes.tsx` (protected route)
 - [ ] Add "Analytics" link to navigation for authenticated users
 - [ ] Create page layout with header and grid layout for charts
+- [ ] **Add centered loading state with Lucide Loader2 icon during data fetch** (animated spinner with "Loading Analytics" message)
 
 **Line Chart - Items Created Over Time**:
 
@@ -2223,8 +2226,96 @@ Validate Phase 6 (Data Visualization) completion:
 - Backend: Test RLS: user A should only see their analytics, not user B's
 - Check logs: verify analytics requests logged with request IDs
 
-**Confirm analytics dashboard fully functional before proceeding to Phase 7 (UX
-Polish).**
+**Confirm analytics dashboard fully functional before proceeding to seed data.**
+
+---
+
+### Unit 11.5: Seed Sample Data for Analytics Testing
+
+**Goal**: Create a database migration to seed sample ideas data for testing analytics dashboard charts and validating data visualization
+
+**Prerequisites**:
+
+- Unit 11 completed (analytics dashboard loads successfully)
+- Database schema verified (ideas table exists with correct columns)
+- User authenticated and can access `/analytics` page
+
+**Deliverables**:
+
+**Schema Validation**:
+
+- [ ] Query Supabase to verify `ideas` table exists with columns: id, user_id, title, description, status, tags, vote_count, created_at, updated_at
+- [ ] Verify `status` column accepts values: 'draft', 'published', 'archived'
+- [ ] Verify `tags` column is TEXT[] array type
+- [ ] Confirm analytics views exist: items_by_date, items_by_status, tags_usage, user_activity
+
+**Migration File Creation**:
+
+- [ ] Create migration file: `supabase/migrations/20251203000001_seed_sample_ideas.sql`
+- [ ] Add migration header with description and timestamp
+- [ ] **CRITICAL**: Add conditional check to prevent duplicate seeding (use `SELECT EXISTS` to check if sample data already present)
+- [ ] Seed exactly **5 sample ideas** with:
+  - Varied statuses (mix of draft, published, archived)
+  - Realistic titles and descriptions
+  - Different creation dates (last 30 days) to populate time-series charts
+  - Mix of tags (3-5 unique tags used across ideas) to populate tag usage chart
+  - Varied vote_counts (0-10 range)
+- [ ] Use parameterized user_id (either hardcoded test user or variable)
+- [ ] Add comments explaining each sample idea's purpose for testing
+
+**Migration Execution**:
+
+- [ ] Run migration manually via Supabase dashboard SQL Editor OR `supabase db push`
+- [ ] Verify migration completes without errors
+- [ ] Query `ideas` table to confirm 5 rows inserted
+- [ ] Refresh `/analytics` page and verify:
+  - Line chart shows data points for seeded dates
+  - Bar chart shows correct status distribution
+  - Pie chart shows tag usage percentages
+  - No empty states visible (charts display actual data)
+
+**Cleanup Plan**:
+
+- [ ] Document how to remove sample data (SQL DELETE command with WHERE clause matching sample titles)
+- [ ] Add comment in migration file noting this is for testing only
+- [ ] Consider adding `is_sample_data` BOOLEAN column for easy cleanup (optional)
+
+**Success Criteria**:
+
+- Migration runs successfully without errors
+- Exactly 5 sample ideas inserted into database
+- Analytics dashboard displays all three charts with real data
+- Charts accurately reflect seeded data (counts, dates, tags match expectations)
+- Sample data does not interfere with RLS policies (user can only see their own seeded ideas)
+- No duplicate data on repeated migration runs
+
+**Estimated Effort**: 30 minutes - 1 hour
+
+---
+
+PAUSE
+
+## AI PROMPT:
+
+Validate Unit 11.5 (Sample Data Seeding) completion:
+
+**VALIDATION CHECKLIST**:
+
+- Migration file exists at `supabase/migrations/20251203000001_seed_sample_ideas.sql`
+- Migration has been run manually via Supabase dashboard
+- Query ideas table: `SELECT COUNT(*) FROM ideas;` - returns 5 (or more if you had existing data)
+- Navigate to `http://localhost:5173/analytics`
+- Verify Line Chart displays data points (no "No data available" message)
+- Verify Bar Chart shows bars for different statuses
+- Verify Pie Chart shows colored segments for tags
+- Query analytics views directly:
+  - `SELECT * FROM items_by_date ORDER BY date DESC LIMIT 10;` - returns rows
+  - `SELECT * FROM items_by_status;` - returns rows with counts
+  - `SELECT * FROM tags_usage ORDER BY usage_count DESC LIMIT 10;` - returns rows
+- Check RLS: sample ideas belong to authenticated test user only
+- Verify migration idempotent (can run twice without duplicate data)
+
+**Confirm sample data successfully seeded and analytics dashboard displays real charts before proceeding to Phase 7 (UX Polish).**
 
 ---
 
