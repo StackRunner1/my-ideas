@@ -1,7 +1,7 @@
 # Authentication Developer Guide
 
-**Version**: 1.0  
-**Last Updated**: November 27, 2025  
+**Version**: 1.1  
+**Last Updated**: December 3, 2025  
 **Implementation**: Session 2, Units 1-16
 
 ---
@@ -24,17 +24,55 @@
 ```
 User Action → Frontend (Redux) → Backend API → Supabase Auth → Response
                 ↓                      ↓
-         Update UI State      Set httpOnly Cookies
+         Update UI State      Set httpOnly Cookies + Return accessToken
 ```
 
 **Key Components:**
 
 - **Backend**: FastAPI with Supabase Admin/User clients
 - **Frontend**: React + Redux + Axios with auto-refresh
+- **API Client**: Single `lib/apiClient.ts` with dual auth strategy (cookies + Authorization header)
 - **State**: Redux auth slice (`isAuthenticated`, `expiresAt`)
-- **Tokens**: httpOnly cookies (never exposed to JavaScript)
+- **Tokens**: httpOnly cookies (primary) + in-memory accessToken (fallback)
 - **Session**: Restored on page load via `/auth/me`
 - **Refresh**: Automatic (5 min before expiry + tab visibility)
+
+### Critical File Structure
+
+**⚠️ IMPORTANT**: Only ONE apiClient.ts file exists in the project:
+
+- ✅ `frontend/src/lib/apiClient.ts` - The configured axios instance with auth
+- ❌ DO NOT create `frontend/src/api/apiClient.ts` or any duplicate
+- ✅ All imports use @ alias: `import apiClient from "@/lib/apiClient"`
+
+**Why this matters**: Multiple apiClient files cause 401 errors because service files may import the wrong (unconfigured) instance.
+
+### Dual Auth Strategy
+
+**Implementation**: The frontend uses BOTH httpOnly cookies AND Authorization headers:
+
+1. **httpOnly Cookies (Primary)**
+
+   - Set by backend after login/signup/refresh
+   - Automatically sent with every request (`withCredentials: true`)
+   - Cannot be accessed by JavaScript (secure against XSS)
+   - Backend reads from cookies first
+
+2. **Authorization Header (Fallback)**
+   - `accessToken` stored in memory via `setAuthToken()`
+   - Added to request headers by axios interceptor
+   - Provides backup authentication if cookies fail
+   - Cleared on logout
+
+**Why both?** Defense in depth - if cookies are blocked or fail, the Authorization header ensures requests still authenticate. Backend accepts either method.
+
+**Implementation in authService:**
+
+```typescript
+// After successful login/signup
+setAuthToken(response.accessToken); // Store in memory
+// Cookies are automatically set by backend
+```
 
 ### Agent-User Pattern
 
@@ -238,7 +276,9 @@ import apiClient from "@/lib/apiClient";
 
 async function getMyIdeas() {
   try {
-    // Cookies sent automatically (withCredentials: true)
+    // Dual auth strategy:
+    // 1. httpOnly cookies sent automatically (withCredentials: true)
+    // 2. Authorization header added from in-memory token (if available)
     // Auto-refreshes if token expired
     const response = await apiClient.get("/ideas");
     return response.data.ideas;
@@ -264,10 +304,12 @@ async function createIdea(title: string, description: string) {
 
 **Key points:**
 
-- No need to manually attach tokens
+- ✅ Always import from `@/lib/apiClient` (never create duplicates)
+- No need to manually attach tokens (dual strategy handles it)
 - Auto-refresh handled by interceptors
 - 401 errors trigger refresh → retry
 - Use `authService` functions for auth-specific operations (login/logout/etc)
+- After login/signup: `setAuthToken(response.accessToken)` is called automatically by authService
 
 ### Conditional UI Based on Auth
 
@@ -450,22 +492,34 @@ function App() {
 
 **Possible Causes:**
 
-1. **Cookies not being sent**
+1. **Wrong apiClient being imported**
 
-   - Check `apiClient.ts` has `withCredentials: true`
+   - ⚠️ Most common issue: Multiple apiClient.ts files exist
+   - Run: `find frontend/src -name "apiClient.ts"` (should find only lib/apiClient.ts)
+   - Check all service imports use `@/lib/apiClient` (not relative paths)
+
+2. **Cookies not being sent**
+
+   - Check `lib/apiClient.ts` has `withCredentials: true`
    - Verify backend CORS allows credentials
    - Check browser cookies in DevTools → Application → Cookies
 
-2. **Backend not receiving cookies**
+3. **Backend not receiving cookies**
 
    - Check CORS `supports_credentials=True` in FastAPI
    - Verify `allow_origins` includes frontend URL exactly
-   - Check `SameSite` cookie policy matches environment
+   - Cookie config: Do NOT set `domain` in development
 
-3. **Token actually expired**
+4. **Token actually expired**
+
    - Check Redux state `expiresAt` value
    - Look for `[Token Refresh]` logs in console
    - Verify `useTokenRefresh` is running in AppRoutes
+
+5. **setAuthToken not called after login**
+   - authService.login() should call `setAuthToken(response.accessToken)`
+   - authService.signup() should call `setAuthToken(response.accessToken)`
+   - Check debug logs: `[API Client] setAuthToken called with: ...`
 
 **Solution:**
 
@@ -575,6 +629,7 @@ app.add_middleware(
        samesite="lax",  # "none" if cross-origin
        max_age=3600,
        path="/"
+       # NOTE: Do NOT set domain in development
    )
    ```
 
@@ -583,10 +638,11 @@ app.add_middleware(
    - Check browser privacy settings
    - Use same-origin setup for dev (both on localhost)
 
-3. **Cookie domain mismatch**
+3. **Cookie domain configuration**
+   - ✅ Development: Do NOT set `domain` key (allows both localhost and 127.0.0.1)
+   - ✅ Production: Set `domain` explicitly if needed
    - Frontend: `localhost:5173`
    - Backend: `localhost:8000`
-   - Both use `localhost` (not `127.0.0.1`)
 
 ---
 
@@ -603,8 +659,8 @@ app.add_middleware(
 
 **Frontend:**
 
+- **API client**: `frontend/src/lib/apiClient.ts` ⚠️ THE ONLY apiClient.ts!
 - Auth service: `frontend/src/services/authService.ts`
-- API client: `frontend/src/lib/apiClient.ts`
 - Auth slice: `frontend/src/store/authSlice.ts`
 - Init auth hook: `frontend/src/hooks/useInitAuth.ts`
 - Token refresh hook: `frontend/src/hooks/useTokenRefresh.ts`
