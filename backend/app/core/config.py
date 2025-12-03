@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = Field(..., env="SUPABASE_SERVICE_ROLE_KEY")
     supabase_anon_key: str = Field(..., env="SUPABASE_ANON_KEY")
 
+    # Timeout and Retry Configuration
+    supabase_timeout_seconds: int = Field(default=10, env="SUPABASE_TIMEOUT_SECONDS")
+    supabase_retry_attempts: int = Field(default=3, env="SUPABASE_RETRY_ATTEMPTS")
+    supabase_retry_backoff_seconds: float = Field(
+        default=1.0, env="SUPABASE_RETRY_BACKOFF_SECONDS"
+    )
+
     # Environment
     env: str = Field(default="local", env="ENV")
 

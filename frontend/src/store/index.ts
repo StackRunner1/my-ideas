@@ -4,10 +4,12 @@
 
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
+import ideasReducer from "./ideasSlice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    ideas: ideasReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

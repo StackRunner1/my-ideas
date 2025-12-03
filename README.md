@@ -6,11 +6,13 @@ and a Python FastAPI backend with Supabase authentication.
 
 ## Stack
 
-- **Frontend**: React 18 + TypeScript + Vite + Redux Toolkit + shadcn/ui
-- **Backend**: FastAPI (Python) + Supabase Auth + SQLite (initial storage)
+- **Frontend**: React 18 + TypeScript + Vite + Redux Toolkit + shadcn/ui + Recharts
+- **Backend**: FastAPI (Python) + Supabase Auth + Supabase Database
 - **Authentication**: Supabase Auth with httpOnly cookies, automatic token refresh
 - **State Management**: Redux Toolkit with persistent auth state
 - **UI Components**: shadcn/ui (Radix UI primitives) with Tailwind CSS
+- **Charts**: Recharts with responsive design
+- **Testing**: Backend (pytest + httpx), Frontend (Vitest + Testing Library)
 
 ## Authentication
 
@@ -55,7 +57,7 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1
 - Python 3.12+
 - Node.js 18+
 - Conda (recommended) or venv
-- Supabase account (for auth)
+- Supabase account (for auth + database)
 
 ### Backend Setup
 
@@ -72,11 +74,20 @@ Create `backend/.env` with your Supabase credentials (see Authentication section
 
 ```powershell
 conda activate ideas
-python -m uvicorn app.main:app --reload --log-level info
+python -m uvicorn app.main:app --reload --log-level info --port 8000
 ```
 
 Backend runs at `http://localhost:8000`  
 API docs at `http://localhost:8000/docs`
+
+**Run backend tests**:
+
+```powershell
+cd backend
+python -m pytest -v
+# With coverage
+python -m pytest --cov=app --cov-report=html
+```
 
 ### Frontend Setup
 
@@ -99,6 +110,15 @@ npm run dev
 
 Frontend runs at `http://localhost:5173`
 
+**Run frontend tests**:
+
+```powershell
+npm test                  # Interactive mode
+npm test -- --run         # Run once
+npm run test:coverage     # With coverage
+npm run test:ui           # Visual UI
+```
+
 ### Development Workflow
 
 Run both servers in separate terminals:
@@ -120,7 +140,49 @@ npm run dev
 
 ## Features
 
-### Current (Session 2 Complete)
+### Session 3 Complete: Production Polish & Design Systems
+
+- ✅ **Observability & Monitoring**
+
+  - Request ID correlation (frontend → backend → logs → response headers)
+  - Structured JSON logging with context propagation
+  - Standardized error response schema with request IDs
+  - Health check endpoint with database connectivity test
+  - Timeout and retry configuration with exponential backoff
+
+- ✅ **Design System**
+
+  - Interactive Style Guide (`/style-guide`) with 5 sections
+  - Extended design tokens (typography, spacing, shadows, z-index)
+  - Native HTML elements showcase with state controls
+  - shadcn/ui component gallery with code examples
+  - Copy-to-clipboard for color values and code snippets
+
+- ✅ **Analytics Dashboard**
+
+  - Recharts integration with 3 chart types
+  - Line chart: Items created over time (last 30 days)
+  - Bar chart: Items by status distribution
+  - Pie chart: Top 10 tag usage
+  - Database views for aggregated analytics
+  - Protected `/analytics` route for authenticated users
+
+- ✅ **UX Enhancements**
+
+  - Loading skeleton screens (reduced perceived latency)
+  - Empty states with helpful CTAs
+  - Error boundaries for graceful error handling
+  - Keyboard shortcuts framework
+  - Skip links for accessibility
+  - Screen reader optimizations (ARIA labels, live regions)
+
+- ✅ **Testing Infrastructure**
+  - Backend: pytest with async support, 13+ tests, 36% baseline coverage
+  - Frontend: Vitest + Testing Library, 8+ component tests
+  - Test fixtures and utilities for consistent testing
+  - Coverage reporting (backend >70%, frontend >60% targets)
+
+### Session 2 Complete: Authentication
 
 - ✅ **User Authentication**
 
@@ -161,37 +223,49 @@ npm run dev
 my-ideas/
 ├── backend/
 │   ├── app/
-│   │   ├── core/          # Configuration (Supabase settings)
+│   │   ├── core/          # Configuration, logging, errors
 │   │   ├── db/            # Database clients (admin/user-scoped)
 │   │   ├── api/
-│   │   │   ├── routes/    # API endpoints (/auth/*)
-│   │   │   └── auth_utils.py  # Auth dependencies
+│   │   │   ├── routes/    # API endpoints (/auth/*, /analytics/*)
+│   │   │   ├── error_handlers.py  # Global exception handlers
+│   │   │   └── auth_utils.py      # Auth dependencies
+│   │   ├── middleware/    # Request ID & timing middleware
 │   │   └── services/      # Agent service for AI operations
+│   ├── tests/             # pytest tests (conftest, test_*)
 │   └── requirements.txt
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/    # UI components (AuthModal, Navigation)
-│   │   ├── hooks/         # React hooks (useInitAuth, useTokenRefresh)
+│   │   ├── components/    # UI components + shadcn/ui
+│   │   │   └── ui/        # shadcn/ui components
+│   │   ├── hooks/         # React hooks (auth, keyboard shortcuts)
 │   │   ├── layouts/       # Page layouts (PublicLayout, UserLayout)
-│   │   ├── lib/           # Utilities (apiClient with auto-refresh)
-│   │   ├── pages/         # Route pages
+│   │   ├── lib/           # Utilities (apiClient, errorHandler, logger)
+│   │   ├── pages/         # Route pages (Home, Dashboard, Analytics, StyleGuide)
 │   │   ├── routes/        # Routing configuration
-│   │   ├── services/      # API service layer (authService)
-│   │   └── store/         # Redux store (auth slice)
+│   │   ├── services/      # API service layer (auth, analytics)
+│   │   ├── store/         # Redux store (auth slice)
+│   │   ├── styles/        # design-system.css with extended tokens
+│   │   └── test/          # Test setup and utilities
 │   └── package.json
 │
+├── supabase/
+│   └── migrations/        # Database migrations (RLS, tables, analytics views)
+│
 └── docs/
-    └── session_two/
-        ├── SupabaseAuth_Implementation_PRD_v1.0.md  # Full PRD
-        └── AUTH_DEVELOPER_GUIDE.md  # Developer guide
+    ├── session_two/       # Session 2: Auth implementation
+    └── session_three/     # Session 3: Production polish
+        ├── Beast_Mode_Polish_PRD.md     # Full PRD (SOURCE OF TRUTH)
+        └── QA_CHECKLIST.md              # Comprehensive QA checklist
 ```
 
 ## Documentation
 
+- **[Session 3: Production Polish PRD](docs/session_three/Beast_Mode_Polish_PRD.md)** - Complete Session 3 reference (13 units)
+- **[Session 3: QA Checklist](docs/session_three/QA_CHECKLIST.md)** - Comprehensive testing and deployment checklist
 - **[Authentication Developer Guide](docs/session_two/AUTH_DEVELOPER_GUIDE.md)** - How to use auth system, protect routes, make authenticated API calls
-- **[Supabase Auth PRD](docs/session_two/SupabaseAuth_Implementation_PRD_v1.0.md)** - Complete implementation reference (17 units)
-- **[Session Checklists](docs/session_two/)** - Step-by-step implementation guides
+- **[Supabase Auth PRD](docs/session_two/SupabaseAuth_Implementation_PRD_v1.0.md)** - Complete auth implementation reference (17 units)
+- **[AGENTS.md](AGENTS.md)** - AI-assisted development workflow guidelines
 
 ## Troubleshooting
 

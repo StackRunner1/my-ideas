@@ -50,6 +50,12 @@ export function useInitAuth(): InitAuthState {
           // Extract token expiry from JWT payload to enable frontend-side scheduling
           const token = userData.user.token;
 
+          console.log("[useInitAuth] Found existing session");
+          console.log(
+            "[useInitAuth] Token from userData:",
+            token ? token.substring(0, 30) + "..." : "MISSING"
+          );
+
           // JWT structure: header.payload.signature
           // Split on '.', take middle part (payload), decode from base64
           const tokenPayload = JSON.parse(atob(token.split(".")[1]));
@@ -57,6 +63,12 @@ export function useInitAuth(): InitAuthState {
           // JWT exp claim is in seconds since epoch, convert to milliseconds
           // This will be used by useTokenRefresh to schedule proactive refresh
           const expiresAt = tokenPayload.exp * 1000;
+
+          // CRITICAL: Store token in memory for Authorization header
+          // Even though we use httpOnly cookies, some endpoints may need the Bearer token
+          const { setAuthToken } = await import("../lib/apiClient");
+          console.log("[useInitAuth] Calling setAuthToken with token");
+          setAuthToken(token);
 
           // Restore session in Redux - updates isAuthenticated to true
           // This triggers Navigation component to show authenticated UI
@@ -78,6 +90,13 @@ export function useInitAuth(): InitAuthState {
             const refreshData = await authService.refreshSession();
 
             if (!isMounted) return; // Component unmounted during refresh
+
+            // CRITICAL: After refresh, fetch current user to get new token
+            const newUserData = await authService.checkAuthStatus();
+            if (newUserData) {
+              const { setAuthToken } = await import("../lib/apiClient");
+              setAuthToken(newUserData.user.token);
+            }
 
             // Refresh succeeded - backend had valid refresh_token cookie
             // User was logged in before, session just expired, now restored

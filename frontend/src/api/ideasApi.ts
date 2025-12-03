@@ -1,34 +1,78 @@
-import apiClient from "./apiClient";
+/**
+ * Ideas API Service
+ * Session 3, Unit 12: Ideas CRUD Operations
+ *
+ * Handles all API calls for ideas management
+ */
+
+import apiClient from "@/lib/apiClient";
 
 export interface Idea {
-  id: number;
+  id: string;
+  user_id: string;
   title: string;
-  description?: string | null;
-  votes: number;
+  description: string;
+  status: "draft" | "published" | "archived";
+  tags: string[];
+  vote_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface IdeaCreate {
+export interface CreateIdeaRequest {
   title: string;
-  description?: string | null;
+  description: string;
+  status?: "draft" | "published" | "archived";
+  tags?: string[];
 }
 
-export async function listIdeas(): Promise<Idea[]> {
-  const res = await apiClient.get<Idea[]>("/ideas");
-  return res.data;
+export interface UpdateIdeaRequest {
+  title?: string;
+  description?: string;
+  status?: "draft" | "published" | "archived";
+  tags?: string[];
 }
 
-export async function createIdea(data: IdeaCreate): Promise<Idea> {
-  const res = await apiClient.post<Idea>("/ideas", data);
-  return res.data;
+/**
+ * Fetch all ideas for the current user
+ */
+export async function getIdeas(): Promise<Idea[]> {
+  const response = await apiClient.get<Idea[]>("/api/v1/ideas");
+  return response.data;
 }
 
-export async function voteIdea(id: number): Promise<Idea> {
-  const res = await apiClient.post<Idea>(`/ideas/${id}/vote`);
-  return res.data;
+/**
+ * Fetch a single idea by ID
+ */
+export async function getIdea(id: string): Promise<Idea> {
+  const response = await apiClient.get<Idea>(`/api/v1/ideas/${id}`);
+  return response.data;
 }
 
-export async function deleteIdea(id: number): Promise<void> {
-  await apiClient.delete(`/ideas/${id}`);
+/**
+ * Create a new idea
+ */
+export async function createIdea(data: CreateIdeaRequest): Promise<Idea> {
+  const response = await apiClient.post<Idea>("/api/v1/ideas", data);
+  return response.data;
+}
+
+/**
+ * Update an existing idea
+ */
+export async function updateIdea(
+  id: string,
+  data: UpdateIdeaRequest
+): Promise<Idea> {
+  const response = await apiClient.patch<Idea>(`/api/v1/ideas/${id}`, data);
+  return response.data;
+}
+
+/**
+ * Delete an idea
+ */
+export async function deleteIdea(id: string): Promise<void> {
+  await apiClient.delete(`/api/v1/ideas/${id}`);
 }
 
 export async function checkHealth(): Promise<{ status: string }> {
