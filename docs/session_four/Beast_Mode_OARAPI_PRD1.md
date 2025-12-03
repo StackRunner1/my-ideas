@@ -388,6 +388,7 @@ Begin with Part A Phase 1 Unit 1.
 ---
 
 ## Phase 1: OpenAI Integration & Agent-User Foundation (Units 1-5):
+
 ### AI PROMPT: Phase 1 Implementation (Units 1-5)
 
 ```
@@ -444,6 +445,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 ```
 
 ### Unit 1: OpenAI SDK Setup
+
 - [ ] Install `openai` Python package and add to requirements.txt
 - [ ] Extend `backend/app/core/config.py` with OpenAI settings: API key, model name, max tokens, temperature, timeout
 - [ ] Create `backend/app/services/openai_service.py` module
@@ -455,6 +457,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Create health check endpoint `GET /api/v1/ai/health` testing OpenAI connectivity and model availability
 
 ### Unit 2: Agent-User Database Schema
+
 - [ ] Create Supabase migration file with timestamp naming convention
 - [ ] Add columns to `user_profile`: agent_user_id (UUID FK), agent_credentials_encrypted (TEXT), agent_created_at (TIMESTAMP), agent_last_used_at (TIMESTAMP)
   - [ ] Add index on `agent_user_id` for performant lookups
@@ -467,6 +470,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Update TypeScript types excluding sensitive fields from frontend exposure
 
 ### Unit 3: Credential Encryption Service
+
 - [ ] Install cryptography package and add to requirements.txt
 - [ ] Extend `backend/app/core/config.py` with ENCRYPTION_KEY setting from environment (base64-encoded Fernet key)
 - [ ] Create script to generate secure encryption key in `scripts/generate_encryption_key.py`
@@ -485,6 +489,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
   - [ ] Fernet provides authenticated encryption preventing tampering
 
 ### Unit 4: Agent-User Creation on Signup
+
 - [ ] Extend `backend/app/api/routes/auth.py` signup endpoint with agent creation logic
   - [ ] After human user creation, generate agent email using pattern `agent_{user_id}@code45.internal`
   - [ ] Generate cryptographically secure random password for agent (32+ characters)
@@ -498,6 +503,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write integration test verifying two auth.users created and credentials stored encrypted
 
 ### Unit 5: Agent Authentication Service
+
 - [ ] Create `backend/app/services/agent_auth.py` module
   - [ ] Implement `authenticate_agent_user(user_id: str)` function that retrieves and decrypts agent credentials then authenticates via Supabase
   - [ ] Implement session caching using in-memory dictionary with expiry tracking
@@ -599,6 +605,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 ```
 
 ### Unit 6: Pydantic Models for Responses API
+
 - [ ] Create `backend/app/models/responses_api.py` module
 - [ ] Define `QueryType` enum with values: sql_generation, data_analysis, summarization
 - [ ] Define `ResponsesAPIOutput` Pydantic model with fields: query_type, generated_sql, explanation, safety_check, confidence
@@ -611,6 +618,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write unit tests for all validation rules and safety checks
 
 ### Unit 7: Responses API Service Implementation
+
 - [ ] Create `backend/app/services/responses_service.py` module
 - [ ] Implement `build_schema_context(agent_client)` function extracting relevant table schemas for prompt context
 - [ ] Implement `generate_sql_query(user_query: str, schema_context: dict)` function calling OpenAI Chat Completions with structured output
@@ -624,6 +632,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write comprehensive tests for SQL generation, safety validation, execution with RLS
 
 ### Unit 8: Responses API Endpoint
+
 - [ ] Create `POST /api/v1/ai/query` endpoint in `backend/app/api/routes/ai.py`
 - [ ] Implement request handling extracting user query and optional schema hints from body
 - [ ] Get authenticated user from session (Session 2 auth dependency)
@@ -750,6 +759,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 ```
 
 ### Unit 9: Redux Chat Slice
+
 - [ ] Create `frontend/src/store/chatSlice.ts` module
 - [ ] Define `ChatState` interface with messages array, loading state, error, token usage
 - [ ] Define `Message` type with id, role (user/assistant), content, timestamp, metadata (tokens, cost)
@@ -764,6 +774,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write tests for reducers and async thunk lifecycle
 
 ### Unit 10: Chat Service Layer
+
 - [ ] Create `frontend/src/services/chatService.ts` module
 - [ ] Define TypeScript interfaces matching backend models: QueryRequest, QueryResult
 - [ ] Implement `sendQuery(query: string)` function calling POST `/api/v1/ai/query`
@@ -775,6 +786,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write service layer tests mocking apiClient
 
 ### Unit 11: ChatInterface Component
+
 - [ ] Create `frontend/src/components/chat/ChatInterface.tsx` component
 - [ ] Implement layout with message list area and input area using shadcn Card and ScrollArea
 - [ ] Create `useChat()` custom hook wrapping Redux actions and selectors
@@ -790,6 +802,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write component tests for user interactions
 
 ### Unit 12: Message Display Components
+
 - [ ] Create `frontend/src/components/chat/MessageCard.tsx` component
   - [ ] Implement different layouts for user vs assistant messages (alignment, colors)
   - [ ] Add avatar or icon indicating message sender
@@ -806,6 +819,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write component tests
 
 ### Unit 13: Chat Route & Navigation Integration
+
 - [ ] Add `/chat` path to `frontend/src/config/paths.ts`
 - [ ] Create `frontend/src/pages/Chat.tsx` page component
 - [ ] Wrap ChatInterface in page layout with header showing "AI Assistant" title
@@ -819,6 +833,7 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Write routing tests
 
 ### Unit 14: Responses API Polish & Testing
+
 - [ ] Add conversation clearing button to chat interface
 - [ ] Implement confirmation dialog before clearing chat history
 - [ ] Add example queries as clickable chips when chat is empty
@@ -840,3 +855,178 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ---
 
+### AI PROMPT: Final Validation - PART A Complete (Responses API)
+
+```
+Help me perform final validation of PART A - Responses API Implementation (Units 1-14):
+
+COMPREHENSIVE VALIDATION CHECKLIST:
+
+**1. Backend Foundation (Phase 1)**
+- Start backend server: python -m uvicorn app.main:app --reload --log-level info from backend/
+- Test OpenAI health check: GET http://localhost:8000/api/v1/ai/health
+- Expected: {"status": "healthy", "openai_connected": true, "model": "gpt-4o-mini"}
+- Verify encryption service: Run unit tests for encrypt/decrypt functions
+- Expected: All encryption tests pass with no plaintext password exposure
+
+**2. Agent-User Creation (Phase 1)**
+- Create new test user via signup endpoint
+- Check Supabase Authentication tab: Verify TWO users created (human user + agent_{uuid}@code45.internal)
+- Check user_profile table: Verify agent_user_id populated and agent_credentials_encrypted contains encrypted data
+- Verify credentials are base64-encoded ciphertext (not plaintext password)
+- Check agent_created_at timestamp is set
+
+**3. Agent Authentication (Phase 1)**
+- Test agent authentication: Call get_agent_client(user_id) for test user
+- Verify agent client returned successfully with user_id and agent_user_id attributes
+- Test RLS enforcement: Use agent client to query items table
+- Expected: Only returns items owned by the authenticated user (RLS working)
+- Check agent_last_used_at timestamp updated in user_profile
+
+**4. SQL Generation & Safety (Phase 2)**
+- Send safe query: POST /api/v1/ai/query with body {"query": "Show me all items created this week"}
+- Expected response includes:
+  - generated_sql: SELECT statement with WHERE and LIMIT clauses
+  - explanation: Natural language description of query
+  - safety_check: true
+  - results: Array of user's items (RLS enforced)
+  - token_usage: {prompt_tokens, completion_tokens, total_tokens}
+  - cost: Calculated cost in USD
+
+**5. SQL Safety Validation (Phase 2)**
+- Test unsafe query: POST /api/v1/ai/query with body {"query": "Delete all items"}
+- Expected: 400 error with message "Unsafe SQL detected: DELETE without WHERE clause"
+- Test another unsafe query: POST /api/v1/ai/query with body {"query": "Drop the items table"}
+- Expected: 400 error with message "Unsafe SQL detected: DROP statement not allowed"
+
+**6. Rate Limiting (Phase 2)**
+- Send 10 queries in rapid succession (within 60 seconds)
+- Expected: All 10 succeed with 200 responses
+- Send 11th query immediately
+- Expected: 429 Too Many Requests with error message "Rate limit exceeded: 10 queries per minute"
+- Wait 60 seconds and try again
+- Expected: Query succeeds (rate limit window reset)
+
+**7. RLS Enforcement (Phase 2)**
+- Login as User A and send query: "Show me all my items"
+- Note item count and IDs in response
+- Logout and login as User B
+- Send same query: "Show me all my items"
+- Expected: Different items returned (User B's items only, not User A's)
+- Verify agent_user_id in backend logs shows different agent accounts for each user
+
+**8. Frontend Chat Interface (Phase 3)**
+- Start frontend: npm run dev from frontend/
+- Navigate to http://localhost:5173
+- Login as test user
+- Click "Chat" link in navigation
+- Expected: ChatInterface component loads with empty state and example queries
+
+**9. Send Query Flow (Phase 3)**
+- Type query in textarea: "What items do I have?"
+- Click Send button (or press Cmd/Ctrl+Enter)
+- Expected sequence:
+  - User message appears immediately (optimistic update)
+  - Loading indicator shows ("AI is thinking...")
+  - Assistant response appears with SQL query in code block
+  - Explanation text displayed
+  - Results table shows queried data
+  - Token usage and cost displayed in expandable metadata section
+
+**10. Message Display (Phase 3)**
+- Verify user messages aligned right with different background color
+- Verify assistant messages aligned left with SQL code block and syntax highlighting
+- Verify timestamp shows relative time ("just now", "2 minutes ago")
+- Click copy button on SQL query
+- Expected: SQL copied to clipboard with success toast
+- Expand metadata section
+- Expected: Shows token counts and cost calculation
+
+**11. Error Handling (Phase 3)**
+- Disconnect network (turn off WiFi or airplane mode)
+- Send query
+- Expected: Error alert displays "Network error: Unable to reach server"
+- Reconnect network
+- Send query again
+- Expected: Works normally
+
+**12. Conversation Management (Phase 3)**
+- Send 3-4 queries building conversation history
+- Verify all messages persist in chat
+- Click "Clear Conversation" button
+- Expected: Confirmation dialog appears
+- Click "Confirm"
+- Expected: All messages cleared, empty state with examples shows again
+
+**13. Mobile Responsiveness (Phase 3)**
+- Resize browser to mobile width (375px)
+- Verify chat interface remains usable
+- Verify message cards stack properly
+- Verify input area and send button accessible
+- Test on actual mobile device if available
+
+**14. Accessibility (Phase 3)**
+- Test keyboard navigation: Tab through all interactive elements
+- Expected: Clear focus indicators on all buttons, inputs, links
+- Test Cmd/Ctrl+Enter shortcut sends message
+- Test with screen reader (if available)
+- Verify all buttons have aria-labels
+- Verify messages have proper semantic structure
+
+**15. Performance (Phase 3)**
+- Send query returning 100+ rows
+- Measure render time
+- Expected: Results table renders in < 2 seconds
+- Verify pagination or virtual scrolling if implemented
+- Check browser console for any performance warnings
+
+**16. Backend Logging & Audit Trail (All Phases)**
+- Check backend logs for a complete query flow
+- Expected log entries:
+  - OpenAI API call with model, prompt tokens, completion tokens, cost
+  - SQL safety validation result
+  - Agent authentication with agent_user_id
+  - Query execution with RLS enforcement
+  - Request ID tracked throughout entire flow
+- Verify no plaintext passwords or encryption keys in logs
+
+**17. Security Verification (All Phases)**
+- Inspect backend .env file: Verify ENCRYPTION_KEY never committed to git
+- Inspect Supabase user_profile table: Verify agent_credentials_encrypted is ciphertext
+- Inspect network requests in browser DevTools: Verify no credentials in response bodies
+- Verify agent sessions expire (test after 1 hour)
+- Verify tokens refreshed automatically on expiry
+
+**18. Cost Tracking Accuracy (Phase 2)**
+- Send query and note token counts and cost from response
+- Manually verify calculation:
+  - GPT-4o-mini pricing: ~$0.150 per 1M input tokens, ~$0.600 per 1M output tokens
+  - Calculate: (prompt_tokens / 1_000_000 * 0.150) + (completion_tokens / 1_000_000 * 0.600)
+  - Verify matches cost in response within rounding tolerance
+
+**FINAL CHECKLIST:**
+- [ ] All Phase 1 tests pass (OpenAI integration, agent-user creation, encryption)
+- [ ] All Phase 2 tests pass (SQL generation, safety validation, RLS, rate limiting)
+- [ ] All Phase 3 tests pass (chat UI, message display, error handling, accessibility)
+- [ ] No security issues found (credentials encrypted, RLS enforced, no secret exposure)
+- [ ] Performance acceptable (query rendering < 2s for 100 rows)
+- [ ] User experience polished (responsive, accessible, clear error messages)
+- [ ] Documentation complete (code comments, inline help, user guide)
+
+After validation:
+- Show me summary of all test results
+- Highlight any failures or issues found
+- Ask me to confirm PART A is complete and ready for production
+
+If all tests pass, PART A (Responses API Implementation) is COMPLETE! ✅
+
+Mark PART A complete in Beast_Mode_OARAPI_PRD1.md. Ready to proceed to PART B (Agent SDK Implementation) when approved.
+```
+
+---
+
+**END OF BEAST MODE PRD - PART A: RESPONSES API IMPLEMENTATION**
+
+---
+
+**Continue to Part B**: See `Beast_Mode_Agent_SDK_PRD2.md` for Agent SDK implementation with tool-calling, multi-specialist architecture, and autonomous agent operations.
