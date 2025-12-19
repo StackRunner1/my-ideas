@@ -27,9 +27,9 @@ def get_fernet() -> Fernet:
     if not settings.encryption_key:
         logger.error("ENCRYPTION_KEY not set in environment variables")
         raise APIError(
+            code="ENCRYPTION_KEY_MISSING",
             message="Encryption key not configured. Please set ENCRYPTION_KEY in .env file.",
             status_code=500,
-            error_code="ENCRYPTION_KEY_MISSING",
         )
 
     try:
@@ -38,9 +38,9 @@ def get_fernet() -> Fernet:
     except Exception as e:
         logger.error("Failed to initialize Fernet cipher (key may be invalid)")
         raise APIError(
+            code="ENCRYPTION_INIT_ERROR",
             message="Encryption initialization failed",
             status_code=500,
-            error_code="ENCRYPTION_INIT_ERROR",
         )
 
 
@@ -69,9 +69,9 @@ def encrypt_password(password: str) -> str:
     except Exception as e:
         logger.error(f"Password encryption failed: {type(e).__name__}")
         raise APIError(
+            code="ENCRYPTION_ERROR",
             message="Password encryption failed",
             status_code=500,
-            error_code="ENCRYPTION_ERROR",
         )
 
 
@@ -103,16 +103,16 @@ def decrypt_password(encrypted: str) -> str:
             "Password decryption failed: Invalid token (tampered or wrong key)"
         )
         raise APIError(
+            code="DECRYPTION_INVALID_TOKEN",
             message="Password decryption failed: Invalid credentials",
             status_code=500,
-            error_code="DECRYPTION_INVALID_TOKEN",
         )
     except Exception as e:
         logger.error(f"Password decryption failed: {type(e).__name__}")
         raise APIError(
+            code="DECRYPTION_ERROR",
             message="Password decryption failed",
             status_code=500,
-            error_code="DECRYPTION_ERROR",
         )
 
 
@@ -149,7 +149,7 @@ def rotate_encryption(old_encrypted: str, old_key: str, new_key: str) -> str:
     except Exception as e:
         logger.error(f"Encryption key rotation failed: {type(e).__name__}")
         raise APIError(
+            code="KEY_ROTATION_ERROR",
             message="Encryption key rotation failed",
             status_code=500,
-            error_code="KEY_ROTATION_ERROR",
         )

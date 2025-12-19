@@ -54,7 +54,7 @@ export async function sendQuery(
     };
 
     const response = await apiClient.post<QueryResult>(
-      "/ai/query",
+      "/api/v1/ai/query",
       requestBody
     );
 

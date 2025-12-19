@@ -53,10 +53,15 @@ def store_agent_credentials(
         APIError: If storage fails
     """
     try:
+        print(f"[AGENT_CREDS] Encrypting agent password...")
         # Encrypt password
         encrypted_password = encrypt_password(agent_password)
+        print(
+            f"[AGENT_CREDS] Password encrypted (length: {len(encrypted_password)} bytes)"
+        )
 
         # Store in database using admin client (bypasses RLS)
+        print(f"[AGENT_CREDS] Updating user_profiles with agent metadata...")
         admin_client = get_admin_client()
 
         result = (
@@ -73,12 +78,16 @@ def store_agent_credentials(
         )
 
         if not result.data:
+            print(
+                f"[AGENT_CREDS] ❌ No rows updated - user_profiles record may not exist"
+            )
             raise APIError(
+                code="AGENT_CREDENTIALS_STORE_ERROR",
                 message="Failed to store agent credentials",
                 status_code=500,
-                error_code="AGENT_CREDENTIALS_STORE_ERROR",
             )
 
+        print(f"[AGENT_CREDS] ✅ Credentials stored successfully")
         logger.info(f"Agent credentials stored for user {user_id}")
 
     except APIError:
@@ -86,9 +95,9 @@ def store_agent_credentials(
     except Exception as e:
         logger.error(f"Failed to store agent credentials: {e}")
         raise APIError(
+            code="AGENT_CREDENTIALS_STORE_ERROR",
             message="Failed to store agent credentials",
             status_code=500,
-            error_code="AGENT_CREDENTIALS_STORE_ERROR",
         )
 
 
@@ -108,6 +117,7 @@ def get_agent_credentials(user_id: str) -> Optional[Tuple[str, str, str]]:
         admin_client = get_admin_client()
 
         # Retrieve from database
+        print(f"[AGENT_CREDS] Querying user_profiles for agent credentials...")
         result = (
             admin_client.table("user_profiles")
             .select("agent_user_id, agent_credentials_encrypted")
@@ -117,6 +127,7 @@ def get_agent_credentials(user_id: str) -> Optional[Tuple[str, str, str]]:
         )
 
         if not result.data:
+            print(f"[AGENT_CREDS] ❌ No user_profiles record found for user {user_id}")
             logger.warning(f"No agent credentials found for user {user_id}")
             return None
 
@@ -124,11 +135,16 @@ def get_agent_credentials(user_id: str) -> Optional[Tuple[str, str, str]]:
         encrypted_password = result.data.get("agent_credentials_encrypted")
 
         if not agent_user_id or not encrypted_password:
+            print(
+                f"[AGENT_CREDS] ❌ Incomplete credentials (agent_user_id: {bool(agent_user_id)}, encrypted: {bool(encrypted_password)})"
+            )
             logger.warning(f"Incomplete agent credentials for user {user_id}")
             return None
 
+        print(f"[AGENT_CREDS] ✅ Credentials found, decrypting...")
         # Decrypt password
         agent_password = decrypt_password(encrypted_password)
+        print(f"[AGENT_CREDS] ✅ Password decrypted successfully")
 
         # Generate agent email (deterministic)
         agent_email = generate_agent_email(user_id)
@@ -142,7 +158,7 @@ def get_agent_credentials(user_id: str) -> Optional[Tuple[str, str, str]]:
     except Exception as e:
         logger.error(f"Failed to retrieve agent credentials: {e}")
         raise APIError(
+            code="AGENT_CREDENTIALS_RETRIEVE_ERROR",
             message="Failed to retrieve agent credentials",
             status_code=500,
-            error_code="AGENT_CREDENTIALS_RETRIEVE_ERROR",
         )

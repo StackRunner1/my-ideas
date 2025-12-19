@@ -14,18 +14,20 @@ import { Textarea } from "../ui/textarea";
 import { useChat } from "../../hooks/useChat";
 import { Message } from "../../store/chatSlice";
 import { MessageCard } from "./MessageCard";
+import { ClearChatDialog } from "./ClearChatDialog";
+import { toast } from "sonner";
 
 const EXAMPLE_QUERIES = [
-  "Show me all items created this week",
+  "Show me all my ideas",
   "What are my most recent ideas?",
   "List all items with their tags",
-  "Count how many items I have by status",
 ];
 
 export function ChatInterface() {
   const { messages, loading, error, sendMessage, clearChat } = useChat();
 
   const [input, setInput] = useState("");
+  const [showClearDialog, setShowClearDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,7 +47,11 @@ export function ChatInterface() {
     if (!input.trim() || loading) return;
 
     sendMessage(input.trim());
-    setInput("");
+
+    // Show success toast
+    toast.success("Query sent", {
+      description: "Processing your request...",
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -61,6 +67,23 @@ export function ChatInterface() {
     textareaRef.current?.focus();
   };
 
+  const handleClearConfirm = () => {
+    clearChat();
+    setShowClearDialog(false);
+    toast.success("Chat cleared", {
+      description: "All messages have been deleted",
+    });
+  };
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      toast.error("Query failed", {
+        description: error,
+      });
+    }
+  }, [error]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Messages Area */}
@@ -70,16 +93,14 @@ export function ChatInterface() {
             // Empty state with examples
             <div className="flex h-full flex-col items-center justify-center space-y-6 text-center">
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold">
-                  Ask me anything about your data
-                </h3>
+                <h3 className="text-lg font-semibold">Let's have a chat</h3>
                 <p className="text-sm text-muted-foreground">
-                  I'll convert your question into SQL and show you the results
+                  Ask about your ideas
                 </p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium">Try these examples:</p>
+                <p className="text-sm font-medium">Try asking:</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {EXAMPLE_QUERIES.map((query) => (
                     <Button
@@ -134,7 +155,7 @@ export function ChatInterface() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your data..."
+            placeholder="Ask about your ideas..."
             className="min-h-[80px] resize-none"
             disabled={loading}
             aria-label="Query input"
@@ -152,7 +173,7 @@ export function ChatInterface() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={clearChat}
+                onClick={() => setShowClearDialog(true)}
                 disabled={loading}
               >
                 Clear Chat
@@ -169,6 +190,13 @@ export function ChatInterface() {
           </div>
         </div>
       </div>
+
+      {/* Clear confirmation dialog */}
+      <ClearChatDialog
+        open={showClearDialog}
+        onOpenChange={setShowClearDialog}
+        onConfirm={handleClearConfirm}
+      />
     </div>
   );
 }

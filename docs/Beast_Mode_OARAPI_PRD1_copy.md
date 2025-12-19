@@ -395,6 +395,14 @@ Begin with Part A Phase 1 Unit 1.
 ```
 Help me implement Phase 1 - OpenAI Integration & Agent-User Foundation (Units 1-5):
 
+**CRITICAL: Error Handling Pattern**
+This application has an established error handling pattern that MUST be followed:
+- All custom exceptions use the APIError class from backend/app/core/errors.py
+- APIError constructor signature: APIError(code: str, message: str, status_code: int, details: Optional[Dict] = None)
+- ALWAYS use 'code=' parameter (NOT 'error_code=')
+- Example: APIError(code="AGENT_AUTH_FAILED", message="...", status_code=401)
+- Never modify the APIError class signature - adhere to the existing pattern
+
 **Setup & Configuration (Unit 1)**
 1. Install openai package and add to requirements.txt
 2. Extend backend/app/core/config.py with OpenAI configuration (API key, model, max tokens, temperature, timeout)
@@ -553,50 +561,106 @@ Mark Phase 1 complete in Beast_Mode_Agent_SDK_PRD.md. Wait for approval before s
 ```
 Help me implement Phase 2 - Responses API & Structured Query Generation (Units 6-8):
 
+**REMINDER: Error Handling Pattern**
+Continue using the established APIError pattern:
+- Use 'code=' parameter (NOT 'error_code=')
+- Example: APIError(code="SQL_GENERATION_ERROR", message="...", status_code=500)
+
 **Pydantic Models (Unit 6)**
 1. Create backend/app/models/responses_api.py module
-2. Define QueryType enum (sql_generation, data_analysis, summarization)
+2. Define QueryType enum (sql_generation, data_analysis, summarization) - **All 3 types supported**
 3. Define ResponsesAPIOutput model with query_type, generated_sql, explanation, safety_check, confidence fields
-4. Add field validators for generated_sql requirement and safety_check blocking dangerous SQL patterns
-5. Implement validate_sql_safety() method checking for DROP, DELETE without WHERE, ALTER, CREATE
-6. Define SQLQueryRequest and QueryResult models
-7. Add JSON schema export for OpenAI structured outputs
-8. Write unit tests for validation rules and safety checks
+   - **CRITICAL**: generated_sql must ALWAYS be a string (never null)
+   - For SQL queries: actual SELECT query
+   - For unsafe SQL: SQL comment like "-- Denied: [reason]"
+   - For conversations: SQL comment like "-- No SQL query needed"
+4. Add field validators for generated_sql safety checking dangerous SQL patterns (DROP, DELETE without WHERE, etc.)
+5. Allow SQL comment placeholders to bypass validation (start with "--")
+6. Implement validate_sql_safety_check() method for comprehensive safety validation
+7. Define SQLQueryRequest and QueryResult models
+8. Add JSON schema export with all properties in required array (strict mode compliant)
+9. Write unit tests for validation rules and safety checks
 
 **Responses Service (Unit 7)**
-9. Create backend/app/services/responses_service.py module
-10. Implement build_schema_context() function extracting table schemas
-11. Implement generate_sql_query() calling OpenAI Chat Completions with structured output
-12. Design system prompt for SQL generation emphasizing safety (SELECT only, WHERE required, LIMIT added)
-13. Configure OpenAI request to return JSON matching ResponsesAPIOutput schema
-14. Implement validate_and_sanitize_sql() with comprehensive safety checks
-15. Implement execute_generated_query() running validated SQL via RLS-enforced agent client
-16. Add result formatting for user-friendly responses
-17. Implement error handling for API failures, unsafe SQL, query execution errors
-18. Add logging for tokens, cost, query types, safety violations
-19. Write comprehensive tests for SQL generation, safety validation, RLS enforcement
+10. Create backend/app/services/responses_service.py module
+11. Implement build_schema_context() function extracting table schemas
+12. **CRITICAL**: Implement generate_sql_query() calling **OpenAI Responses API** with dual-mode support
+    - **Official Documentation**: https://platform.openai.com/docs/api-reference/responses
+    - **Structured Outputs Guide**: https://platform.openai.com/docs/guides/structured-outputs
+    - **MUST use**: `client.responses.parse()` with `text_format=ResponsesAPIOutput` parameter
+    - **Response parsing**: Use `response.output_parsed` to get the parsed Pydantic model instance
+13. Design **dual-mode system prompt** supporting both conversational chat AND database queries
+    - Explain all 3 query types: sql_generation, data_analysis, summarization
+    - Provide clear examples for when to use each type
+    - For conversations: Return SQL comment placeholder "-- No SQL query needed"
+    - For SQL queries: Generate safe SELECT queries with LIMIT
+    - For unsafe requests: Return "-- Denied: [reason]" with safety_check=false
+14. Implement process_query_request() with conversational query detection
+    - Detect SQL comment placeholders (starts with "--")
+    - Skip SQL execution for conversational queries
+    - Return explanation only (no SQL shown to user)
+15. Implement validate_and_sanitize_sql() with comprehensive safety checks
+16. **CRITICAL - NO RPC**: Implement execute_generated_query() using **DIRECT Supabase table queries**
+    - **DO NOT use RPC calls** (`agent_client.rpc()`)
+    - **DO NOT create PostgreSQL stored functions** for dynamic SQL execution
+    - **MUST parse SQL and execute via PostgREST**: Use `agent_client.table().select()` methods
+    - Parse SELECT statements to extract table name, columns, WHERE conditions, LIMIT
+    - Execute using native Supabase client methods (RLS automatically enforced)
+    - For simple queries: `agent_client.table(table_name).select(columns).limit(limit).execute()`
+17. Add result formatting for user-friendly responses
+18. Implement error handling for API failures, unsafe SQL, query execution errors
+19. Add logging for tokens, cost, query types, safety violations, conversational vs SQL detection
+20. Write comprehensive tests for SQL generation, conversational responses, safety validation, RLS enforcement
 
 **Responses Endpoint (Unit 8)**
-20. Create POST /api/v1/ai/query endpoint in backend/app/api/routes/ai.py
-21. Implement request handling extracting user query and optional schema hints
-22. Get authenticated user from session using Session 2 auth dependency
-23. Get agent client using get_agent_client(user_id) for RLS enforcement
-24. Call responses service to generate and execute SQL query
-25. Return normalized response with results, explanation, tokens, cost
-26. Implement rate limiting (10 queries per minute per user)
-27. Add request ID tracking for audit trail
-28. Implement error responses matching Session 3 format
-29. Add OpenAPI documentation
-30. Write endpoint tests for success, rate limiting, RLS, errors
+21. Create POST /api/v1/ai/query endpoint in backend/app/api/routes/ai.py
+22. Implement request handling extracting user query (supports both conversational and database queries)
+23. Get authenticated user from session using Session 2 auth dependency
+24. Get agent client using get_agent_client(user_id) for RLS enforcement
+25. Call responses service to generate response (may be SQL query or conversation)
+26. Return normalized response with results, explanation, tokens, cost
+    - For conversations: Return explanation only, no SQL shown
+    - For SQL queries: Return SQL, explanation, and results
+    - For unsafe SQL: Return denial message with safety_check=false
+27. Implement rate limiting (10 queries per minute per user)
+28. Add request ID tracking for audit trail
+29. Implement error responses matching Session 3 format
+30. Add OpenAPI documentation for dual-mode endpoint
+31. Write endpoint tests for conversational queries, SQL queries, unsafe requests, rate limiting, RLS
 
-**Validation**
-31. Test SQL generation with natural language query: POST /api/v1/ai/query with query "Show me all items created this week"
-32. Verify response includes: generated_sql, explanation, safety_check: true, results array
-33. Test safety validation with unsafe query: POST /api/v1/ai/query with query "Delete all items"
-34. Expected result: 400 error with safety violation message
-35. Test RLS enforcement: verify query only returns authenticated user's data
-36. Test rate limiting: send 11 requests rapidly, verify 11th is rate-limited
-37. Check backend logs: verify token usage and cost tracking working
+**IMPORTANT: Testing Prerequisite**
+Before testing the AI query endpoint, you MUST create a NEW user account via the signup flow:
+- Agent-user creation happens automatically during signup (Phase 1 Unit 4)
+- Existing users from previous sessions do NOT have agent-users
+- **Solution: Create a fresh test user using POST /api/v1/auth/signup**
+- After signup, verify in user_profiles table that agent_user_id is populated
+- Without an agent-user, /api/v1/ai/query will fail with "Failed to retrieve agent credentials"
+
+**Why not use existing users?** The agent-user creation logic was added in Phase 1 Unit 4. Users created before this implementation do not have the required agent credentials and cannot use AI features.
+
+**Validation - Multi-Turn Function Calling**
+32. Test conversational interaction: POST /api/v1/ai/query with query "How are you?"
+33. Verify response: explanation only (LLM responds directly, no tool calls), success=true
+34. **CRITICAL MULTI-TURN TEST**: POST /api/v1/ai/query with query "Show me all ideas created this week"
+35. Expected Turn 1: LLM calls query_database function with SQL
+36. Expected Turn 2: Function executes SQL, returns results to LLM
+37. Expected Final Response:
+    - LLM's natural language summary of the data (e.g., "You have 3 ideas created this week: ...")
+    - Raw results array included for frontend display
+    - generated_sql shows the executed query
+    - Token usage includes both turns
+38. **CRITICAL**: Verify backend logs show:
+    - "[RESPONSES_API] Turn 1 complete" - initial query with tools
+    - "[TOOL_CALL] query_database: ..." - function call detected
+    - "[SQL_EXEC] Executing: SELECT ..." - SQL execution
+    - "[SQL_EXEC] Success: X rows returned"
+    - "[RESPONSES_API] Sending tool results back to LLM"
+    - "[RESPONSES_API] Turn 2 complete" - LLM sees data and responds
+39. Test unsafe query: POST /api/v1/ai/query with query "Delete all ideas"
+40. Expected: LLM refuses (doesn't call function), responds with explanation why it can't
+41. Test RLS enforcement: Verify results only include authenticated user's data
+42. Test rate limiting: 11 rapid requests, verify 11th is rate-limited
+43. Check token/cost tracking: Verify costs sum both API calls correctly
 
 After implementation:
 - Show me key files for review (responses_api.py, responses_service.py, ai.py routes)
@@ -609,42 +673,105 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 ### Unit 6: Pydantic Models for Responses API
 
 - [x] Create `backend/app/models/responses_api.py` module
-- [x] Define `QueryType` enum with values: sql_generation, data_analysis, summarization
-- [x] Define `ResponsesAPIOutput` Pydantic model with fields: query_type, generated_sql, explanation, safety_check, confidence
-  - [x] Add field validators ensuring generated_sql required when query_type is sql_generation
-  - [x] Add validator for safety_check ensuring dangerous SQL patterns rejected
-  - [x] Implement `validate_sql_safety()` method checking for DROP, DELETE without WHERE, ALTER, CREATE statements
-- [x] Define `SQLQueryRequest` model for user queries with natural language question and optional schema context
+- [x] Define `QueryType` enum with values: sql_generation, data_analysis, summarization (all 3 supported)
+- [x] Define `ResponsesAPIOutput` Pydantic model with all required fields
+  - [x] **CRITICAL**: Make `generated_sql` ALWAYS required as string (never null)
+  - [x] For SQL queries: return actual SELECT query
+  - [x] For unsafe SQL: return SQL comment "-- Denied: [reason]"
+  - [x] For conversations: return SQL comment "-- No SQL query needed"
+- [x] Add field validators for `generated_sql` safety validation
+  - [x] Allow SQL comment placeholders (start with "--") to bypass validation
+  - [x] Block dangerous patterns: DROP, DELETE without WHERE, ALTER, CREATE
+- [x] Implement `validate_sql_safety_check()` method for comprehensive safety validation
+  - [x] Recognize SQL comment placeholders as safe (won't execute)
+  - [x] Check for LIMIT clause, JOIN complexity, etc.
+- [x] Define `SQLQueryRequest` model for user queries with natural language question
 - [x] Define `QueryResult` model for response including results, explanation, token usage, cost
-- [x] Add JSON schema export for OpenAI structured outputs configuration
+- [x] Add JSON schema export with all properties in `required` array (strict mode compliant)
+  - [x] `generated_sql` as type "string" (not nullable)
+  - [x] Nullable fields use union types: `{"type": ["number", "null"]}`
 - [x] Write unit tests for all validation rules and safety checks
 
-### Unit 7: Responses API Service Implementation
+### Unit 7: Responses API Service Implementation with Function Calling
 
+**Tool Architecture**: Uses simple functional approach in `backend/app/tools/database_tools.py` - just dicts and functions following OpenAI's official spec. See [TOOLS_ARCHITECTURE.md](./TOOLS_ARCHITECTURE.md).
+
+- [x] **Tools Module** (`backend/app/tools/`)
+  - [x] `database_tools.py`: QUERY_DATABASE_TOOL dict + execute_query_database() function
+  - [x] `__init__.py`: Exports ALL_TOOLS list and TOOL_HANDLERS dict
+  - [x] Simple functional approach - no classes, no abstractions
 - [x] Create `backend/app/services/responses_service.py` module
-- [x] Implement `build_schema_context(agent_client)` function extracting relevant table schemas for prompt context
-- [x] Implement `generate_sql_query(user_query: str, schema_context: dict)` function calling OpenAI Chat Completions with structured output
-  - [x] Design system prompt for SQL generation emphasizing safety: SELECT only, require WHERE for deletions, add LIMIT if missing
-  - [x] Configure OpenAI request to return JSON matching ResponsesAPIOutput schema
+- [x] Import tools: `from ..tools import ALL_TOOLS, TOOL_HANDLERS`
+- [x] Define `query_database` function tool following OpenAI Responses API spec
+  - **Official Documentation**: https://platform.openai.com/docs/api-reference/responses/create
+  - **Function Calling Guide**: https://platform.openai.com/docs/guides/function-calling
+  - Tool is simple dict with: type="function", name, description, parameters schema
+  - Lives in `backend/app/tools/database_tools.py`
+- [ ] Implement `build_schema_context()` returning database schema description as string
+  - Include all tables: ideas, votes, comments with columns and types
+  - Add RLS notes, PostgreSQL syntax requirements, LIMIT clause requirement
+- [x] SQL validation and execution in `backend/app/tools/database_tools.py`
+  - [x] `validate_sql_safety()`: Must be SELECT, block dangerous keywords
+  - [x] `execute_query_database()`: Parses SQL, executes via PostgREST (NO RPC)
+  - [x] Direct table queries: `agent_client.table().select()` with RLS enforcement
+- [x] **CRITICAL**: Implement `process_query_request()` with multi-turn function calling
+  - **Turn 1**: Call `client.responses.create()` with tools=ALL_TOOLS (from tools module)
+    - Include system instructions with database schema
+    - Set `tool_choice="auto"` - LLM decides if it needs data
+    - Check response.output for function_call items
+    - If no tool calls: Extract output_text and return (conversational response)
+  - **Turn 2**: If tool calls present:
+    - Parse function name and arguments (sql, explanation)
+    - Call tool handler via `TOOL_HANDLERS[tool_name](agent_client, **args)`
+    - Build tool_results with function_call_output type
+    - Call `client.responses.create()` with `previous_response_id` (multi-turn)
+    - Send tool_results as input
+    - LLM sees actual data and formats natural language response
+  - **Return**: QueryResult with LLM's formatted explanation + raw results
+  - **Token tracking**: Sum tokens from both API calls
+  - **Logging**: Log each turn, tool calls, SQL execution, results count
+- [x] Add comprehensive logging throughout the flow
+  - Log initial query, tool calls detected, SQL executed, results returned
+  - Log token usage and cost for both turns
+  - Use structured logging from Session 3
+  - [x] Configure OpenAI request with correct parameters and Pydantic model
+- [x] Implement `process_query_request()` with conversational query detection
+  - [x] Detect SQL comment placeholders (`generated_sql.startswith("--")`)
+  - [x] Skip SQL execution for conversational queries
+  - [x] Return explanation only (set generated_sql=None in response to hide from user)
+  - [x] Handle unsafe SQL requests with proper error messages
 - [x] Implement `validate_and_sanitize_sql(sql: str)` function with comprehensive safety checks
-- [x] Implement `execute_generated_query(agent_client, sql: str)` function running validated SQL via RLS-enforced client
-- [x] Add result formatting converting database response to user-friendly format
+- [ ] **CRITICAL - NO RPC**: Implement `execute_generated_query(agent_client, sql: str)` using direct PostgREST queries
+  - [ ] Parse SELECT statements to extract table, columns, WHERE, ORDER BY, LIMIT
+  - [ ] Execute via `agent_client.table(table_name).select().execute()` (NOT `agent_client.rpc()`)
+  - [ ] DO NOT create PostgreSQL stored functions for dynamic SQL
+  - [ ] RLS automatically enforced through agent_client session
+- [ ] Add result formatting converting database response to user-friendly format
 - [x] Implement error handling for OpenAI API failures, unsafe SQL generation, query execution errors
-- [x] Add logging for all API calls including tokens, cost, query types, safety violations
-- [x] Write comprehensive tests for SQL generation, safety validation, execution with RLS
+- [x] Add logging for all API calls including tokens, cost, query types, safety violations, conversational detection
+- [x] Write comprehensive tests for SQL generation, conversational responses, safety validation, execution with RLS
 
 ### Unit 8: Responses API Endpoint
 
 - [x] Create `POST /api/v1/ai/query` endpoint in `backend/app/api/routes/ai.py`
-- [x] Implement request handling extracting user query and optional schema hints from body
+- [x] Implement request handling extracting user query (supports both conversational and database queries)
 - [x] Get authenticated user from session (Session 2 auth dependency)
 - [x] Get agent client using `get_agent_client(user_id)` for RLS-enforced database access
-- [x] Call responses service to generate and execute SQL query
-- [x] Return normalized response including results, explanation, tokens, cost
+- [x] Call responses service to generate response (handles both chat and SQL automatically)
+- [x] Return normalized response with appropriate fields based on query type:
+  - [x] For conversations: Return explanation only, no SQL shown to user
+  - [x] For SQL queries: Return SQL, explanation, and results (when execution works)
+  - [x] For unsafe SQL: Return denial message with safety_check=false
 - [x] Implement rate limiting (10 queries per minute per user) using middleware or decorator
 - [x] Add request ID tracking for full audit trail
 - [x] Implement error responses with consistent format matching Session 3 patterns
-- [x] Add endpoint documentation with OpenAPI schema
+- [x] Add endpoint documentation with OpenAPI schema describing dual-mode behavior
+- [x] Write endpoint tests for:
+  - [x] Conversational queries ("How are you?", "What can you do?")
+  - [x] SQL queries ("Show me my items", "Count my tags")
+  - [x] Unsafe requests ("Delete all items", "Update items")
+  - [x] Rate limiting (11th request blocked)
+  - [x] RLS enforcement (user sees only their data)
 - [x] Write endpoint tests covering success cases, rate limiting, RLS enforcement, error scenarios
 
 ---
@@ -659,6 +786,14 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ```
 Help me implement Phase 3 - Frontend Chat Interface for Responses API (Units 9-14):
+
+**TESTING PREREQUISITE REMINDER**
+Before testing the chat interface, you MUST use a user account created AFTER Phase 1 implementation:
+- **If you have an existing user from previous sessions: Sign up with a NEW email address**
+- Agent-users are created automatically during signup (Phase 1 Unit 4)
+- Existing users do NOT have agent-users and cannot use the chat feature
+- After signup with a new account, everything will work seamlessly
+- To verify: Check user_profiles table - agent_user_id should be populated
 
 **Redux State Management (Unit 9)**
 1. Create frontend/src/store/chatSlice.ts module
@@ -762,29 +897,29 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ### Unit 9: Redux Chat Slice
 
-- [ ] Create `frontend/src/store/chatSlice.ts` module
-- [ ] Define `ChatState` interface with messages array, loading state, error, token usage
-- [ ] Define `Message` type with id, role (user/assistant), content, timestamp, metadata (tokens, cost)
-- [ ] Create slice with reducers: addMessage, setLoading, setError, clearMessages, updateTokenUsage
-- [ ] Create `sendQuery` async thunk calling `/api/v1/ai/query` endpoint
-  - [ ] Implement optimistic update adding user message immediately before API call
-  - [ ] Implement thunk fulfilled handler adding assistant response to messages
-  - [ ] Implement error handling storing error message in state
-- [ ] Add selectors for messages, loading state, total tokens used, total cost
-- [ ] Export actions and reducer
-- [ ] Integrate chat reducer into root store configuration
+- [x] Create `frontend/src/store/chatSlice.ts` module
+- [x] Define `ChatState` interface with messages array, loading state, error, token usage
+- [x] Define `Message` type with id, role (user/assistant), content, timestamp, metadata (tokens, cost)
+- [x] Create slice with reducers: addMessage, setLoading, setError, clearMessages, updateTokenUsage
+- [x] Create `sendQuery` async thunk calling `/api/v1/ai/query` endpoint
+  - [x] Implement optimistic update adding user message immediately before API call
+  - [x] Implement thunk fulfilled handler adding assistant response to messages
+  - [x] Implement error handling storing error message in state
+- [x] Add selectors for messages, loading state, total tokens used, total cost
+- [x] Export actions and reducer
+- [x] Integrate chat reducer into root store configuration
 - [ ] Write tests for reducers and async thunk lifecycle
 
 ### Unit 10: Chat Service Layer
 
-- [ ] Create `frontend/src/services/chatService.ts` module
-- [ ] Define TypeScript interfaces matching backend models: QueryRequest, QueryResult
-- [ ] Implement `sendQuery(query: string)` function calling POST `/api/v1/ai/query`
-- [ ] Implement response parsing and validation
-- [ ] Add error handling with user-friendly error messages
-- [ ] Implement `getConversationHistory()` function (placeholder for future persistence)
-- [ ] Add logging for debugging (client-side console logs in development only)
-- [ ] Export all service functions
+- [x] Create `frontend/src/services/chatService.ts` module
+- [x] Define TypeScript interfaces matching backend models: QueryRequest, QueryResult
+- [x] Implement `sendQuery(query: string)` function calling POST `/api/v1/ai/query`
+- [x] Implement response parsing and validation
+- [x] Add error handling with user-friendly error messages
+- [x] Implement `getConversationHistory()` function (placeholder for future persistence)
+- [x] Add logging for debugging (client-side console logs in development only)
+- [x] Export all service functions
 - [ ] Write service layer tests mocking apiClient
 
 ### Unit 11: ChatInterface Component
@@ -806,46 +941,46 @@ npx shadcn@latest add table alert scroll-area textarea sheet drawer
 
 **After running the CLI command:**
 
-- [ ] Verify `src/components/ui/table.tsx` was created
-- [ ] Verify `src/components/ui/alert.tsx` was created
-- [ ] Verify `src/components/ui/scroll-area.tsx` was created
-- [ ] Verify `src/components/ui/textarea.tsx` was created
-- [ ] Verify `src/components/ui/sheet.tsx` was created
-- [ ] Verify `src/components/ui/drawer.tsx` was created
-- [ ] Check `package.json` for new `@radix-ui/react-scroll-area` dependency
-- [ ] Run `npm install` to install any new dependencies
+- [x] Verify `src/components/ui/table.tsx` was created
+- [x] Verify `src/components/ui/alert.tsx` was created
+- [x] Verify `src/components/ui/scroll-area.tsx` was created
+- [x] Verify `src/components/ui/textarea.tsx` was created
+- [x] Verify `src/components/ui/sheet.tsx` was created
+- [x] Verify `src/components/ui/drawer.tsx` was created
+- [x] Check `package.json` for new `@radix-ui/react-scroll-area` dependency
+- [x] Run `npm install` to install any new dependencies
 
 **Component Implementation Tasks:**
 
-- [ ] Create `frontend/src/components/chat/ChatInterface.tsx` component
-- [ ] Implement layout with message list area and input area using shadcn Card and ScrollArea
-- [ ] Create `useChat()` custom hook wrapping Redux actions and selectors
-- [ ] Implement message rendering with distinct styling for user vs assistant messages
-- [ ] Create input field using shadcn Textarea with send button
-- [ ] Implement send handler dispatching `sendQuery` thunk and clearing input
-- [ ] Add loading indicator during API call (disable input, show thinking animation)
-- [ ] Implement auto-scroll to latest message on new message arrival
-- [ ] Add empty state when no messages exist with helpful prompt examples
-- [ ] Implement error display using shadcn Alert component
-- [ ] Add keyboard shortcut (Cmd/Ctrl+Enter) to send message
-- [ ] Make component responsive for mobile screens
+- [x] Create `frontend/src/components/chat/ChatInterface.tsx` component
+- [x] Implement layout with message list area and input area using shadcn Card and ScrollArea
+- [x] Create `useChat()` custom hook wrapping Redux actions and selectors
+- [x] Implement message rendering with distinct styling for user vs assistant messages
+- [x] Create input field using shadcn Textarea with send button
+- [x] Implement send handler dispatching `sendQuery` thunk and clearing input
+- [x] Add loading indicator during API call (disable input, show thinking animation)
+- [x] Implement auto-scroll to latest message on new message arrival
+- [x] Add empty state when no messages exist with helpful prompt examples
+- [x] Implement error display using shadcn Alert component
+- [x] Add keyboard shortcut (Cmd/Ctrl+Enter) to send message
+- [x] Make component responsive for mobile screens
 - [ ] Write component tests for user interactions
 
 ### Unit 12: Message Display Components
 
-- [ ] Create `frontend/src/components/chat/MessageCard.tsx` component
-  - [ ] Implement different layouts for user vs assistant messages (alignment, colors)
-  - [ ] Add avatar or icon indicating message sender
-  - [ ] Display timestamp in relative format (e.g., "2 minutes ago")
-  - [ ] Show SQL query in code block with syntax highlighting for assistant responses
-  - [ ] Display explanation text clearly separated from query
-  - [ ] Show metadata (tokens used, cost) in collapsed section expandable on click
-  - [ ] Add copy-to-clipboard button for SQL queries
-- [ ] Create `frontend/src/components/chat/QueryResultsTable.tsx` for displaying data results
-  - [ ] Implement table with column headers from database response
-  - [ ] Add row limit with "show more" pagination if results exceed limit
-  - [ ] Style using shadcn Table component
-- [ ] Make components accessible (ARIA labels, keyboard navigation)
+- [x] Create `frontend/src/components/chat/MessageCard.tsx` component
+  - [x] Implement different layouts for user vs assistant messages (alignment, colors)
+  - [x] Add avatar or icon indicating message sender
+  - [x] Display timestamp in relative format (e.g., "2 minutes ago")
+  - [x] Show SQL query in code block with syntax highlighting for assistant responses
+  - [x] Display explanation text clearly separated from query
+  - [x] Show metadata (tokens used, cost) in collapsed section expandable on click
+  - [x] Add copy-to-clipboard button for SQL queries
+- [x] Create `frontend/src/components/chat/QueryResultsTable.tsx` for displaying data results
+  - [x] Implement table with column headers from database response
+  - [x] Add row limit with "show more" pagination if results exceed limit
+  - [x] Style using shadcn Table component
+- [x] Make components accessible (ARIA labels, keyboard navigation)
 - [ ] Write component tests
 
 ### Unit 13: Floating Chat Button & Drawer Integration
@@ -868,39 +1003,39 @@ npx shadcn@latest add sheet
 
 **Component Implementation Tasks:**
 
-- [ ] Create `frontend/src/components/chat/FloatingChatButton.tsx` component
-  - [ ] Implement floating button fixed to bottom-right corner (e.g., `fixed bottom-4 right-4 z-50`)
-  - [ ] Use MessageSquare icon from lucide-react with badge showing unread count (future)
-  - [ ] Add hover animation and accessible button label
-  - [ ] Implement onClick handler to open chat drawer
-  - [ ] Make button responsive (hide on very small screens if needed)
-- [ ] Create `frontend/src/components/chat/ChatDrawer.tsx` component wrapping ChatInterface
-  - [ ] Use shadcn Sheet component with side="right" for right-side drawer
-  - [ ] Set drawer width to appropriate size (e.g., `w-full md:w-[500px] lg:w-[600px]`)
-  - [ ] Drawer should span full viewport height
-  - [ ] Include Sheet header with "AI Assistant" title and close button
-  - [ ] Include token/cost display in drawer header
-  - [ ] Wrap ChatInterface component in Sheet content area
-  - [ ] Manage drawer open/closed state with React state
-- [ ] Integrate FloatingChatButton into `frontend/src/layouts/UserLayout.tsx`
-  - [ ] Render FloatingChatButton as persistent element in authenticated layout
-  - [ ] Ensure button appears on all authenticated pages (Dashboard, Ideas, Profile, Analytics)
-  - [ ] Pass drawer open/close handlers to FloatingChatButton
-- [ ] **Remove chat from navigation** - delete Chat link from Navigation.tsx
-- [ ] **Remove dedicated chat route** - delete /chat route from AppRoutes.tsx and Chat.tsx page file
-- [ ] Test drawer functionality: open, close, chat while on different pages
-- [ ] Test responsiveness: drawer should be full-width on mobile, partial-width on desktop
+- [x] Create `frontend/src/components/chat/FloatingChatButton.tsx` component
+  - [x] Implement floating button fixed to bottom-right corner (e.g., `fixed bottom-4 right-4 z-50`)
+  - [x] Use MessageSquare icon from lucide-react with badge showing unread count (future)
+  - [x] Add hover animation and accessible button label
+  - [x] Implement onClick handler to open chat drawer
+  - [x] Make button responsive (hide on very small screens if needed)
+- [x] Create `frontend/src/components/chat/ChatDrawer.tsx` component wrapping ChatInterface
+  - [x] Use shadcn Sheet component with side="right" for right-side drawer
+  - [x] Set drawer width to appropriate size (e.g., `w-full md:w-[500px] lg:w-[600px]`)
+  - [x] Drawer should span full viewport height
+  - [x] Include Sheet header with "AI Assistant" title and close button
+  - [x] Include token/cost display in drawer header
+  - [x] Wrap ChatInterface component in Sheet content area
+  - [x] Manage drawer open/closed state with React state
+- [x] Integrate FloatingChatButton into `frontend/src/layouts/UserLayout.tsx`
+  - [x] Render FloatingChatButton as persistent element in authenticated layout
+  - [x] Ensure button appears on all authenticated pages (Dashboard, Ideas, Profile, Analytics)
+  - [x] Pass drawer open/close handlers to FloatingChatButton
+- [x] **Remove chat from navigation** - delete Chat link from Navigation.tsx
+- [x] **Remove dedicated chat route** - delete /chat route from AppRoutes.tsx and Chat.tsx page file
+- [x] Test drawer functionality: open, close, chat while on different pages
+- [x] Test responsiveness: drawer should be full-width on mobile, partial-width on desktop
 - [ ] Write component tests for drawer interactions
 
 ### Unit 14: Responses API Polish & Testing
 
-- [ ] Add conversation clearing button to chat interface
-- [ ] Implement confirmation dialog before clearing chat history
-- [ ] Add example queries as clickable chips when chat is empty
-- [ ] Implement token/cost display in chat header showing session totals
+- [x] Add conversation clearing button to chat interface
+- [x] Implement confirmation dialog before clearing chat history
+- [x] Add example queries as clickable chips when chat is empty
+- [x] Implement token/cost display in chat header showing session totals
 - [ ] Add settings panel for adjusting query parameters (temperature, max tokens) - future enhancement hook
 - [ ] Implement loading skeleton states for better perceived performance
-- [ ] Add toast notifications for successful query execution and errors
+- [x] Add toast notifications for successful query execution and errors
 - [ ] Write E2E test scenarios: send query, receive response, verify SQL generation, verify results display
 - [ ] Write test for rate limiting behavior from user perspective
 - [ ] Write test for RLS enforcement (user should only see their data)
@@ -939,24 +1074,24 @@ COMPREHENSIVE VALIDATION CHECKLIST:
 **3. Agent Authentication (Phase 1)**
 - Test agent authentication: Call get_agent_client(user_id) for test user
 - Verify agent client returned successfully with user_id and agent_user_id attributes
-- Test RLS enforcement: Use agent client to query items table
-- Expected: Only returns items owned by the authenticated user (RLS working)
+- Test RLS enforcement: Use agent client to query ideas table
+- Expected: Only returns ideas owned by the authenticated user (RLS working)
 - Check agent_last_used_at timestamp updated in user_profile
 
 **4. SQL Generation & Safety (Phase 2)**
-- Send safe query: POST /api/v1/ai/query with body {"query": "Show me all items created this week"}
+- Send safe query: POST /api/v1/ai/query with body {"query": "Show me all ideas created this week"}
 - Expected response includes:
   - generated_sql: SELECT statement with WHERE and LIMIT clauses
   - explanation: Natural language description of query
   - safety_check: true
-  - results: Array of user's items (RLS enforced)
+  - results: Array of user's ideas (RLS enforced)
   - token_usage: {prompt_tokens, completion_tokens, total_tokens}
   - cost: Calculated cost in USD
 
 **5. SQL Safety Validation (Phase 2)**
-- Test unsafe query: POST /api/v1/ai/query with body {"query": "Delete all items"}
+- Test unsafe query: POST /api/v1/ai/query with body {"query": "Delete all ideas"}
 - Expected: 400 error with message "Unsafe SQL detected: DELETE without WHERE clause"
-- Test another unsafe query: POST /api/v1/ai/query with body {"query": "Drop the items table"}
+- Test another unsafe query: POST /api/v1/ai/query with body {"query": "Drop the ideas table"}
 - Expected: 400 error with message "Unsafe SQL detected: DROP statement not allowed"
 
 **6. Rate Limiting (Phase 2)**
@@ -968,11 +1103,11 @@ COMPREHENSIVE VALIDATION CHECKLIST:
 - Expected: Query succeeds (rate limit window reset)
 
 **7. RLS Enforcement (Phase 2)**
-- Login as User A and send query: "Show me all my items"
-- Note item count and IDs in response
+- Login as User A and send query: "Show me all my ideas"
+- Note idea count and IDs in response
 - Logout and login as User B
-- Send same query: "Show me all my items"
-- Expected: Different items returned (User B's items only, not User A's)
+- Send same query: "Show me all my ideas"
+- Expected: Different ideas returned (User B's ideas only, not User A's)
 - Verify agent_user_id in backend logs shows different agent accounts for each user
 
 **8. Frontend Chat Interface (Phase 3)**
@@ -983,7 +1118,7 @@ COMPREHENSIVE VALIDATION CHECKLIST:
 - Expected: ChatInterface component loads with empty state and example queries
 
 **9. Send Query Flow (Phase 3)**
-- Type query in textarea: "What items do I have?"
+- Type query in textarea: "What ideas do I have?"
 - Click Send button (or press Cmd/Ctrl+Enter)
 - Expected sequence:
   - User message appears immediately (optimistic update)

@@ -1,394 +1,249 @@
-"""Responses API service for SQL generation and query execution.
+"""Responses API service with function calling for database queries.
 
-Provides functions for generating SQL from natural language using OpenAI,
-validating safety, and executing queries via RLS-enforced agent client.
+Implements multi-turn conversation where:
+1. LLM decides if it needs database access
+2. LLM calls query_database() function tool
+3. We execute the SQL and return results
+4. LLM sees results and formats natural language response
 """
 
 import json
-import logging
-import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from supabase import Client
 
 from ..core.errors import APIError
-from ..models.responses_api import (QueryResult, QueryType, ResponsesAPIOutput,
-                                    TokenUsage, get_responses_api_schema)
+from ..core.logging import get_logger
+from ..models.responses_api import QueryResult, QueryType, TokenUsage
+from ..tools import ALL_TOOLS, TOOL_HANDLERS
 from .openai_service import calculate_cost, get_openai_client
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
-def build_schema_context(agent_client: Client) -> Dict[str, Any]:
-    """Extract relevant table schemas for SQL generation context.
-
-    Args:
-        agent_client: RLS-enforced Supabase client
-
-    Returns:
-        Dictionary with table schemas and column information
-    """
-    try:
-        # For now, provide a static schema for items and tags tables
-        # In production, this could query information_schema or be configured
-        schema = {
-            "tables": {
-                "items": {
-                    "columns": [
-                        {"name": "id", "type": "uuid", "description": "Primary key"},
-                        {"name": "title", "type": "text", "description": "Item title"},
-                        {
-                            "name": "description",
-                            "type": "text",
-                            "description": "Item description",
-                        },
-                        {
-                            "name": "status",
-                            "type": "text",
-                            "description": "Item status (active, archived, etc.)",
-                        },
-                        {
-                            "name": "user_id",
-                            "type": "uuid",
-                            "description": "Owner user ID (filtered by RLS)",
-                        },
-                        {
-                            "name": "created_at",
-                            "type": "timestamptz",
-                            "description": "Creation timestamp",
-                        },
-                        {
-                            "name": "updated_at",
-                            "type": "timestamptz",
-                            "description": "Last update timestamp",
-                        },
-                    ],
-                    "description": "User's ideas/items",
-                },
-                "tags": {
-                    "columns": [
-                        {"name": "id", "type": "uuid", "description": "Primary key"},
-                        {
-                            "name": "item_id",
-                            "type": "uuid",
-                            "description": "Foreign key to items",
-                        },
-                        {
-                            "name": "label",
-                            "type": "text",
-                            "description": "Tag label/name",
-                        },
-                        {
-                            "name": "created_at",
-                            "type": "timestamptz",
-                            "description": "Creation timestamp",
-                        },
-                    ],
-                    "description": "Tags associated with items",
-                },
-            },
-            "notes": [
-                "All queries are automatically scoped to the authenticated user via RLS",
-                "Always use SELECT queries only",
-                "Add LIMIT clause to prevent large result sets",
-                "Use PostgreSQL syntax and functions",
-            ],
-        }
-
-        return schema
-
-    except Exception as e:
-        logger.error(f"Failed to build schema context: {e}")
-        return {"tables": {}, "notes": ["Schema information unavailable"]}
-
-
-def generate_sql_query(
-    user_query: str, schema_context: Dict[str, Any]
-) -> ResponsesAPIOutput:
-    """Generate SQL query from natural language using OpenAI Responses API.
-
-    Args:
-        user_query: Natural language question from user
-        schema_context: Database schema information
-
-    Returns:
-        ResponsesAPIOutput with generated SQL and metadata
-
-    Raises:
-        APIError: If SQL generation fails
-    """
-    try:
-        client = get_openai_client()
-
-        # Build system prompt emphasizing safety
-        system_prompt = f"""You are a SQL query generator for a personal ideas management application.
-
+def build_schema_context() -> str:
+    """Build database schema description for system instructions."""
+    return """
 DATABASE SCHEMA:
-{json.dumps(schema_context, indent=2)}
+- ideas: id (uuid), user_id (uuid), title (text), description (text), status (draft|published|archived), tags (text[]), vote_count (int), created_at (timestamptz), updated_at (timestamptz)
+- votes: id (uuid), idea_id (uuid), user_id (uuid), created_at (timestamptz)
+- comments: id (uuid), idea_id (uuid), user_id (uuid), content (text), parent_id (uuid), created_at (timestamptz), updated_at (timestamptz)
 
-SAFETY RULES (CRITICAL):
-1. ONLY generate SELECT queries - no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE
-2. ALWAYS add a LIMIT clause (default: LIMIT 50 unless user specifies otherwise)
-3. For DELETE or UPDATE requests, explain why you cannot do them
-4. Use PostgreSQL syntax and functions
-5. Respect RLS - queries are automatically scoped to the authenticated user
-6. Avoid complex subqueries when possible
-7. Use proper JOINs when querying related tables
-
-RESPONSE FORMAT:
-- query_type: Always "sql_generation" for SQL queries
-- generated_sql: The SQL query (SELECT only, with LIMIT)
-- explanation: Clear explanation of what the query does
-- safety_check: Always true if query follows rules
-- confidence: Your confidence level (0.0-1.0)
-- warnings: Any caveats about the query
-
-If the user asks for something unsafe (DELETE, DROP, etc.), set safety_check to false and explain why in the explanation field.
+NOTES:
+- All queries automatically scoped to authenticated user via RLS
+- Use PostgreSQL syntax
+- Always add LIMIT clause (default 50)
+- Only SELECT queries allowed
 """
 
-        # Build user message
-        user_message = f"Generate a SQL query for this question: {user_query}"
 
-        # Call OpenAI with structured output
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            response_format=get_responses_api_schema(),
-            temperature=0.3,  # Lower temperature for more consistent SQL
-            max_tokens=1000,
-        )
-
-        # Parse response
-        content = response.choices[0].message.content
-        if not content:
-            raise APIError(
-                message="OpenAI returned empty response",
-                status_code=500,
-                error_code="EMPTY_RESPONSE",
-            )
-
-        response_data = json.loads(content)
-        output = ResponsesAPIOutput(**response_data)
-
-        # Log token usage and cost
-        usage = response.usage
-        if usage:
-            cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
-            logger.info(
-                f"SQL generated: tokens={usage.total_tokens}, cost=${cost:.6f}, "
-                f"safety={output.safety_check}, confidence={output.confidence}"
-            )
-
-        return output
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse OpenAI response as JSON: {e}")
-        raise APIError(
-            message="Invalid response format from AI",
-            status_code=500,
-            error_code="INVALID_RESPONSE_FORMAT",
-        )
-    except Exception as e:
-        logger.error(f"SQL generation failed: {e}")
-        raise APIError(
-            message=f"Failed to generate SQL query: {str(e)}",
-            status_code=500,
-            error_code="SQL_GENERATION_ERROR",
-        )
-
-
-def validate_and_sanitize_sql(sql: str) -> tuple[bool, List[str]]:
-    """Comprehensive SQL safety validation.
-
-    Args:
-        sql: SQL query to validate
-
-    Returns:
-        Tuple of (is_safe, warnings/errors)
-    """
-    errors = []
-    sql_upper = sql.upper().strip()
-
-    # Must be SELECT query
-    if not sql_upper.startswith("SELECT"):
-        errors.append("Only SELECT queries are allowed")
-        return False, errors
-
-    # Dangerous operations
-    dangerous_keywords = [
-        "DROP",
-        "TRUNCATE",
-        "ALTER",
-        "CREATE",
-        "GRANT",
-        "REVOKE",
-        "EXECUTE",
-    ]
-    for keyword in dangerous_keywords:
-        if re.search(rf"\b{keyword}\b", sql_upper):
-            errors.append(f"Dangerous keyword detected: {keyword}")
-            return False, errors
-
-    # DELETE without WHERE
-    if re.search(r"\bDELETE\s+FROM\s+\w+\s*(?!WHERE)", sql_upper):
-        errors.append("DELETE without WHERE clause not allowed")
-        return False, errors
-
-    # UPDATE without WHERE
-    if re.search(r"\bUPDATE\s+\w+\s+SET\s+.*(?!WHERE)", sql_upper):
-        errors.append("UPDATE without WHERE clause not allowed")
-        return False, errors
-
-    # SQL injection patterns
-    injection_patterns = [
-        r";\s*DROP",
-        r";\s*DELETE",
-        r";\s*INSERT",
-        r"--",  # SQL comments
-        r"/\*.*\*/",  # Block comments
-        r"\bUNION\s+SELECT",  # UNION injection
-    ]
-    for pattern in injection_patterns:
-        if re.search(pattern, sql_upper):
-            errors.append(f"Potential SQL injection pattern detected")
-            return False, errors
-
-    # Warnings (not blocking)
-    warnings = []
-    if "LIMIT" not in sql_upper:
-        warnings.append("Missing LIMIT clause - query may return large result set")
-
-    if sql_upper.count("JOIN") > 3:
-        warnings.append(f"Query has {sql_upper.count('JOIN')} JOINs - may be slow")
-
-    return True, warnings
-
-
-def execute_generated_query(
-    agent_client: Client, sql: str, user_query: str
-) -> QueryResult:
-    """Execute validated SQL query via RLS-enforced agent client.
-
-    Args:
-        agent_client: RLS-enforced Supabase client
-        sql: Validated SQL query
-        user_query: Original natural language query
-
-    Returns:
-        QueryResult with execution results
-
-    Raises:
-        APIError: If query execution fails
-    """
-    try:
-        # Final safety check
-        is_safe, messages = validate_and_sanitize_sql(sql)
-        if not is_safe:
-            logger.warning(f"Unsafe SQL blocked: {sql[:100]}")
-            return QueryResult(
-                success=False,
-                error=f"Unsafe SQL query: {', '.join(messages)}",
-                generated_sql=sql,
-                warnings=messages,
-            )
-
-        # Execute query using RLS-enforced client
-        logger.info(f"Executing SQL: {sql[:100]}...")
-        result = agent_client.rpc("exec_sql", {"query": sql}).execute()
-
-        # Format results
-        results = result.data if result.data else []
-        row_count = len(results) if isinstance(results, list) else 0
-
-        logger.info(f"Query executed successfully: {row_count} rows returned")
-
-        return QueryResult(
-            success=True,
-            query_type=QueryType.SQL_GENERATION,
-            generated_sql=sql,
-            results=results,
-            row_count=row_count,
-            warnings=messages,  # Include any warnings from validation
-        )
-
-    except Exception as e:
-        logger.error(f"Query execution failed: {e}")
-        return QueryResult(
-            success=False,
-            error=f"Query execution failed: {str(e)}",
-            generated_sql=sql,
-        )
+# ============================================================================
+# MULTI-TURN CONVERSATION HANDLER
+# ============================================================================
 
 
 def process_query_request(
     agent_client: Client, user_query: str, schema_hints: Optional[Dict[str, Any]] = None
 ) -> QueryResult:
-    """Process complete query request: generate SQL, validate, execute.
+    """Process query with multi-turn function calling.
 
-    This is the main entry point for the Responses API flow.
+    Flow:
+    1. Send user query to LLM with query_database tool
+    2. If LLM calls tool, execute SQL and return results
+    3. LLM sees results and formats natural response
+    4. Return final response to user
 
     Args:
         agent_client: RLS-enforced Supabase client
         user_query: Natural language question
-        schema_hints: Optional schema context overrides
+        schema_hints: Optional additional schema info
 
     Returns:
-        QueryResult with complete execution results
+        QueryResult with LLM's formatted response
     """
     try:
-        # Build schema context
-        schema_context = build_schema_context(agent_client)
-        if schema_hints:
-            schema_context.update(schema_hints)
+        client = get_openai_client()
 
-        # Generate SQL using OpenAI
-        logger.info(f"Processing query: {user_query[:100]}")
-        llm_output = generate_sql_query(user_query, schema_context)
+        # Build system instructions
+        system_instructions = f"""You are an AI assistant for a personal ideas management application.
 
-        # Check if LLM marked as unsafe
-        if not llm_output.safety_check:
-            logger.warning(f"LLM marked query as unsafe: {user_query[:100]}")
-            return QueryResult(
-                success=False,
-                query_type=llm_output.query_type,
-                explanation=llm_output.explanation,
-                error="Query violates safety rules",
-                warnings=llm_output.warnings,
+{build_schema_context()}
+
+When users ask about their data:
+1. Use the query_database function to fetch data
+2. After seeing results, provide a natural, conversational response
+3. Format data clearly (counts, lists, summaries)
+4. If no results, explain kindly
+
+For general questions (greetings, help, etc.):
+- Respond conversationally without calling functions
+"""
+
+        logger.info(f"[RESPONSES_API] Processing query: {user_query[:100]}")
+
+        # ===== TURN 1: Initial LLM call with tools =====
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            instructions=system_instructions,
+            input=[{"role": "user", "content": user_query}],
+            tools=ALL_TOOLS,  # Tools from centralized module
+            tool_choice="auto",  # LLM decides if it needs the tool
+            temperature=0.7,
+            max_output_tokens=2000,
+        )
+
+        logger.info(f"[RESPONSES_API] Turn 1 complete, status={response.status}")
+
+        # Check if LLM called the function
+        tool_calls = []
+        for item in response.output:
+            # Function calls can be top-level items OR nested in messages
+            if item.type == "function_call":
+                tool_calls.append(item)
+                logger.info(f"[RESPONSES_API] ✅ Tool call detected: {item.name}")
+            elif item.type == "message" and hasattr(item, "content"):
+                for content_item in item.content:
+                    if (
+                        hasattr(content_item, "type")
+                        and content_item.type == "function_call"
+                    ):
+                        tool_calls.append(content_item)
+                        logger.info(
+                            f"[RESPONSES_API] ✅ Tool call detected: {content_item.name}"
+                        )
+
+        # If no tool calls, LLM responded directly (conversational)
+        if not tool_calls:
+            logger.warning(
+                "[RESPONSES_API] ⚠️ No tool calls detected - LLM chose conversational response"
+            )
+            logger.warning(f"[RESPONSES_API] Query was: '{user_query}'")
+            logger.warning(
+                "[RESPONSES_API] This may indicate: tool not passed correctly, or LLM didn't recognize data query"
             )
 
-        # Validate generated SQL
-        if not llm_output.generated_sql:
+            # Extract text response
+            response_text = ""
+            for item in response.output:
+                if item.type == "message" and item.role == "assistant":
+                    for content_item in item.content:
+                        if (
+                            hasattr(content_item, "type")
+                            and content_item.type == "output_text"
+                        ):
+                            response_text += content_item.text
+
             return QueryResult(
-                success=False,
-                explanation=llm_output.explanation,
-                error="No SQL query was generated",
+                success=True,
+                query_type=QueryType.SUMMARIZATION,
+                generated_sql=None,
+                explanation=response_text,
+                results=[],
+                row_count=0,
+                token_usage=TokenUsage(
+                    prompt_tokens=response.usage.input_tokens,
+                    completion_tokens=response.usage.output_tokens,
+                    total_tokens=response.usage.total_tokens,
+                ),
+                cost=calculate_cost(
+                    response.usage.input_tokens, response.usage.output_tokens
+                ),
             )
 
-        # Note: We can't execute raw SQL directly via Supabase client without a stored procedure
-        # For now, we'll return the generated SQL for the user to review
-        # In production, you'd need to create a PostgreSQL function to execute dynamic SQL
+        # ===== TURN 2: Execute tool calls and get final response =====
+        logger.info(f"[RESPONSES_API] {len(tool_calls)} tool call(s) detected")
 
-        logger.info(f"SQL generated successfully: {llm_output.generated_sql[:100]}")
+        # Execute all tool calls
+        tool_results = []
+        executed_sql = None
+        all_results = []
+
+        for tool_call in tool_calls:
+            # ResponseFunctionToolCall has name/arguments directly (not under .function)
+            tool_name = tool_call.name
+            args = json.loads(tool_call.arguments)
+
+            # Get tool handler from registry
+            if tool_name in TOOL_HANDLERS:
+                logger.info(f"[TOOL_CALL] {tool_name}: {args.get('explanation', '')}")
+
+                # Execute tool
+                result = TOOL_HANDLERS[tool_name](agent_client, **args)
+
+                # Track SQL for query_database
+                if tool_name == "query_database":
+                    executed_sql = args.get("sql", "")
+                    logger.info(f"[TOOL_CALL] SQL: {executed_sql}")
+
+                all_results.extend(result.get("results", []))
+
+                tool_results.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": json.dumps(result),
+                    }
+                )
+            else:
+                logger.error(f"[TOOL_CALL] Unknown tool: {tool_name}")
+                tool_results.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": json.dumps(
+                            {"success": False, "error": f"Unknown tool: {tool_name}"}
+                        ),
+                    }
+                )
+
+        # Send tool results back to LLM for final formatting
+        logger.info("[RESPONSES_API] Sending tool results back to LLM")
+
+        final_response = client.responses.create(
+            model="gpt-4o-mini",
+            previous_response_id=response.id,  # Multi-turn conversation
+            input=tool_results,  # Tool execution results
+            temperature=0.7,
+            max_output_tokens=2000,
+        )
+
+        logger.info(f"[RESPONSES_API] Turn 2 complete, status={final_response.status}")
+
+        # Extract final response text
+        final_text = ""
+        for item in final_response.output:
+            if item.type == "message" and item.role == "assistant":
+                for content_item in item.content:
+                    if (
+                        hasattr(content_item, "type")
+                        and content_item.type == "output_text"
+                    ):
+                        final_text += content_item.text
+
+        # Calculate total token usage
+        total_input = response.usage.input_tokens + final_response.usage.input_tokens
+        total_output = response.usage.output_tokens + final_response.usage.output_tokens
+        total_tokens = total_input + total_output
 
         return QueryResult(
             success=True,
-            query_type=llm_output.query_type,
-            generated_sql=llm_output.generated_sql,
-            explanation=llm_output.explanation,
-            results=[],  # Would contain actual results if we could execute
-            row_count=0,
-            warnings=llm_output.warnings,
+            query_type=QueryType.SQL_GENERATION,
+            generated_sql=executed_sql,
+            explanation=final_text,
+            results=all_results,
+            row_count=len(all_results),
+            token_usage=TokenUsage(
+                prompt_tokens=total_input,
+                completion_tokens=total_output,
+                total_tokens=total_tokens,
+            ),
+            cost=calculate_cost(total_input, total_output),
         )
 
-    except APIError:
-        raise
     except Exception as e:
-        logger.error(f"Query processing failed: {e}")
+        logger.error(f"[RESPONSES_API] Query processing failed: {e}", exc_info=True)
         raise APIError(
+            code="QUERY_PROCESSING_ERROR",
             message=f"Failed to process query: {str(e)}",
             status_code=500,
-            error_code="QUERY_PROCESSING_ERROR",
         )

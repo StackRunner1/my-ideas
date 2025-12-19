@@ -44,9 +44,9 @@ def get_openai_client() -> OpenAI:
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
         raise APIError(
+            code="OPENAI_CLIENT_ERROR",
             message="Failed to initialize OpenAI client",
             status_code=500,
-            error_code="OPENAI_CLIENT_ERROR",
         )
 
 
@@ -135,28 +135,28 @@ async def test_openai_connection() -> dict:
     except RateLimitError as e:
         logger.error(f"OpenAI rate limit exceeded: {e}")
         raise APIError(
+            code="OPENAI_RATE_LIMIT",
             message="OpenAI rate limit exceeded",
             status_code=429,
-            error_code="OPENAI_RATE_LIMIT",
         )
     except Timeout as e:
         logger.error(f"OpenAI request timeout: {e}")
         raise APIError(
+            code="OPENAI_TIMEOUT",
             message="OpenAI request timeout",
             status_code=504,
-            error_code="OPENAI_TIMEOUT",
         )
     except OpenAIError as e:
         logger.error(f"OpenAI API error: {e}")
         raise APIError(
+            code="OPENAI_API_ERROR",
             message="OpenAI API error",
             status_code=500,
-            error_code="OPENAI_API_ERROR",
         )
     except Exception as e:
         logger.error(f"Unexpected error testing OpenAI connection: {e}")
         raise APIError(
+            code="OPENAI_CONNECTION_ERROR",
             message="Failed to test OpenAI connection",
             status_code=500,
-            error_code="OPENAI_CONNECTION_ERROR",
         )

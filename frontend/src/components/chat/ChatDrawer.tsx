@@ -36,7 +36,7 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
           <SheetHeader className="border-b px-6 py-4">
             <SheetTitle>AI Assistant</SheetTitle>
             <SheetDescription>
-              Ask questions about your data in natural language
+              Let's have a chat about your ideas
             </SheetDescription>
             {totalTokens > 0 && (
               <div className="flex gap-4 pt-2 text-xs text-muted-foreground">

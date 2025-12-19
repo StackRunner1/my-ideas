@@ -62,26 +62,31 @@ CREATE TABLE IF NOT EXISTS public.ideas (
 -- Enable RLS
 ALTER TABLE public.ideas ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for ideas
-CREATE POLICY "Users can view published ideas"
+-- RLS Policies for ideas (SIMPLIFIED FOR DEMO/LEARNING)
+-- Note: This is a demo application - we use simplified policies where
+-- any authenticated user has full CRUD access. This allows agent-users
+-- to operate seamlessly without complex ownership checks.
+-- For production multi-tenant apps, use stricter auth.uid() = user_id policies.
+
+CREATE POLICY "Authenticated users can view all ideas"
   ON public.ideas
   FOR SELECT
-  USING (status = 'published' OR auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can create own ideas"
+CREATE POLICY "Authenticated users can create ideas"
   ON public.ideas
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can update own ideas"
+CREATE POLICY "Authenticated users can update ideas"
   ON public.ideas
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can delete own ideas"
+CREATE POLICY "Authenticated users can delete ideas"
   ON public.ideas
   FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
 -- Indexes for performance
 CREATE INDEX idx_ideas_user_id ON public.ideas(user_id);
@@ -109,21 +114,21 @@ CREATE TABLE IF NOT EXISTS public.votes (
 -- Enable RLS
 ALTER TABLE public.votes ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for votes
-CREATE POLICY "Users can view all votes"
+-- RLS Policies for votes (SIMPLIFIED FOR DEMO/LEARNING)
+CREATE POLICY "Authenticated users can view all votes"
   ON public.votes
   FOR SELECT
-  USING (true); -- All authenticated users can see vote counts
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can create own votes"
+CREATE POLICY "Authenticated users can create votes"
   ON public.votes
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can delete own votes"
+CREATE POLICY "Authenticated users can delete votes"
   ON public.votes
   FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
 -- Indexes for performance
 CREATE INDEX idx_votes_idea_id ON public.votes(idea_id);
@@ -148,39 +153,26 @@ CREATE TABLE IF NOT EXISTS public.comments (
 -- Enable RLS
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for comments
-CREATE POLICY "Users can view comments on published ideas"
+-- RLS Policies for comments (SIMPLIFIED FOR DEMO/LEARNING)
+CREATE POLICY "Authenticated users can view all comments"
   ON public.comments
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.ideas
-      WHERE ideas.id = comments.idea_id
-      AND (ideas.status = 'published' OR ideas.user_id = auth.uid())
-    )
-  );
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can create comments on published ideas"
+CREATE POLICY "Authenticated users can create comments"
   ON public.comments
   FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id
-    AND EXISTS (
-      SELECT 1 FROM public.ideas
-      WHERE ideas.id = comments.idea_id
-      AND ideas.status = 'published'
-    )
-  );
+  WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can update own comments"
+CREATE POLICY "Authenticated users can update comments"
   ON public.comments
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can delete own comments"
+CREATE POLICY "Authenticated users can delete comments"
   ON public.comments
   FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() IS NOT NULL);
 
 -- Indexes for performance
 CREATE INDEX idx_comments_idea_id ON public.comments(idea_id);

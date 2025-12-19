@@ -21,14 +21,19 @@ class QueryType(str, Enum):
 class ResponsesAPIOutput(BaseModel):
     """Structured output from OpenAI Responses API for SQL generation.
 
-    This model is used as the response_format for OpenAI API calls,
+    This model is used for OpenAI Responses API calls with strict mode,
     ensuring the LLM returns structured, validated data.
+
+    NOTE: All fields are required by OpenAI strict mode.
+    - generated_sql is ALWAYS a string (even for unsafe requests, use placeholder)
+    - Other nullable fields use union types (T | None)
     """
 
     query_type: QueryType = Field(..., description="Type of query being processed")
 
-    generated_sql: Optional[str] = Field(
-        None, description="Generated SQL query (required for sql_generation type)"
+    # ALWAYS required - for unsafe requests, use placeholder like "-- Denied: unsafe operation"
+    generated_sql: str = Field(
+        ..., description="Generated SQL query or denial message for unsafe requests"
     )
 
     explanation: str = Field(
@@ -39,31 +44,29 @@ class ResponsesAPIOutput(BaseModel):
         ..., description="Whether the SQL passed safety validation"
     )
 
-    confidence: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
+    # Nullable fields using union types for strict mode compatibility
+    confidence: float | None = Field(
+        default=None,
         description="Confidence score for the generated query (0.0-1.0)",
     )
 
-    warnings: List[str] = Field(
-        default_factory=list, description="Any warnings about the query"
+    warnings: List[str] | None = Field(
+        default=None, description="Any warnings about the query"
     )
 
     @field_validator("generated_sql")
     @classmethod
-    def validate_sql_required(cls, v: Optional[str], info) -> Optional[str]:
-        """Ensure generated_sql is provided for sql_generation queries."""
-        query_type = info.data.get("query_type")
-        if query_type == QueryType.SQL_GENERATION and not v:
-            raise ValueError("generated_sql is required for sql_generation query type")
-        return v
+    def validate_sql_safety(cls, v: str) -> str:
+        """Basic SQL safety validation.
 
-    @field_validator("generated_sql")
-    @classmethod
-    def validate_sql_safety(cls, v: Optional[str]) -> Optional[str]:
-        """Basic SQL safety validation."""
+        Note: For denied/unsafe requests, LLM should return a SQL comment placeholder
+        like '-- SQL generation denied: unsafe operation' which will pass validation.
+        """
         if not v:
+            raise ValueError("generated_sql cannot be empty")
+
+        # Allow SQL comment placeholders for denied requests
+        if v.strip().startswith("--"):
             return v
 
         sql_upper = v.upper().strip()
@@ -104,8 +107,13 @@ class ResponsesAPIOutput(BaseModel):
         if not self.generated_sql:
             return True, []
 
-        warnings = []
         sql_upper = self.generated_sql.upper().strip()
+
+        # SQL comment placeholders for denied requests are considered "safe" (won't execute)
+        if sql_upper.startswith("--"):
+            return True, ["Query was denied - SQL comment placeholder returned"]
+
+        warnings = []
 
         # Must be SELECT query
         if not sql_upper.startswith("SELECT"):
@@ -178,8 +186,8 @@ class QueryResult(BaseModel):
 
     cost: Optional[float] = Field(None, ge=0.0, description="Estimated cost in USD")
 
-    warnings: List[str] = Field(
-        default_factory=list, description="Any warnings about the query execution"
+    warnings: List[str] | None = Field(
+        default=None, description="Any warnings about the query execution"
     )
 
     error: Optional[str] = Field(None, description="Error message if query failed")
@@ -211,10 +219,19 @@ class QueryResult(BaseModel):
 
 
 def get_responses_api_schema() -> Dict[str, Any]:
-    """Get JSON schema for OpenAI structured outputs.
+    """Get JSON schema for OpenAI Responses API structured outputs.
+
+    CRITICAL: This schema is for OpenAI Responses API with strict mode.
+    - ALL properties MUST be in the required array (strict mode requirement)
+    - Nullable fields use union types: {"type": ["string", "null"]}
+    - additionalProperties MUST be false
+
+    Official Documentation:
+    - Responses API: https://platform.openai.com/docs/api-reference/responses
+    - Structured Outputs: https://platform.openai.com/docs/guides/structured-outputs
 
     Returns:
-        JSON schema compatible with OpenAI API response_format parameter
+        JSON schema compatible with OpenAI Responses API text.format parameter
     """
     return {
         "type": "json_schema",
@@ -227,10 +244,11 @@ def get_responses_api_schema() -> Dict[str, Any]:
                     "query_type": {
                         "type": "string",
                         "enum": ["sql_generation", "data_analysis", "summarization"],
+                        "description": "Type of query being processed",
                     },
                     "generated_sql": {
                         "type": "string",
-                        "description": "The generated SQL query",
+                        "description": "The generated SQL query, or a SQL comment placeholder for denied/unsafe requests (e.g., '-- Denied: unsafe operation')",
                     },
                     "explanation": {
                         "type": "string",
@@ -240,10 +258,27 @@ def get_responses_api_schema() -> Dict[str, Any]:
                         "type": "boolean",
                         "description": "Whether SQL passed safety checks",
                     },
-                    "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                    "warnings": {"type": "array", "items": {"type": "string"}},
+                    "confidence": {
+                        "type": ["number", "null"],
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": "Confidence score 0.0-1.0 (null if not applicable)",
+                    },
+                    "warnings": {
+                        "type": ["array", "null"],
+                        "items": {"type": "string"},
+                        "description": "List of warnings (null if none)",
+                    },
                 },
-                "required": ["query_type", "explanation", "safety_check"],
+                # CRITICAL: All properties MUST be in required array for strict mode
+                "required": [
+                    "query_type",
+                    "generated_sql",
+                    "explanation",
+                    "safety_check",
+                    "confidence",
+                    "warnings",
+                ],
                 "additionalProperties": False,
             },
         },

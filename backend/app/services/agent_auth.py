@@ -37,24 +37,38 @@ def authenticate_agent_user(user_id: str) -> dict:
         APIError: If authentication fails
     """
     try:
+        print(f"[AGENT_AUTH] ========== AGENT AUTHENTICATION REQUESTED ==========")
+        print(f"[AGENT_AUTH] Human user ID: {user_id}")
+
         # Check cache first
         cached_session = _agent_sessions.get(user_id)
         if cached_session and cached_session["expires_at"] > time.time():
+            print(
+                f"[AGENT_AUTH] ✅ Using cached session (expires in {int(cached_session['expires_at'] - time.time())}s)"
+            )
             logger.debug(f"Using cached agent session for user {user_id}")
             return cached_session
 
+        print(f"[AGENT_AUTH] No valid cached session, authenticating...")
+
         # Retrieve and decrypt agent credentials
+        print(f"[AGENT_AUTH] Retrieving agent credentials from user_profiles...")
         credentials = get_agent_credentials(user_id)
         if not credentials:
+            print(f"[AGENT_AUTH] ❌ No agent credentials found in user_profiles")
             raise APIError(
+                code="AGENT_CREDENTIALS_NOT_FOUND",
                 message="Agent credentials not found for user",
                 status_code=404,
-                error_code="AGENT_CREDENTIALS_NOT_FOUND",
             )
 
         agent_user_id, agent_email, agent_password = credentials
+        print(f"[AGENT_AUTH] ✅ Credentials retrieved and decrypted")
+        print(f"[AGENT_AUTH] Agent email: {agent_email}")
+        print(f"[AGENT_AUTH] Agent user ID: {agent_user_id}")
 
         # Authenticate agent-user with Supabase
+        print(f"[AGENT_AUTH] Signing in agent to Supabase...")
         admin_client = get_admin_client()
 
         try:
@@ -64,19 +78,21 @@ def authenticate_agent_user(user_id: str) -> dict:
                     "password": agent_password,
                 }
             )
+            print(f"[AGENT_AUTH] ✅ Agent signed in to Supabase successfully")
         except Exception as e:
+            print(f"[AGENT_AUTH] ❌ Sign-in failed: {str(e)}")
             logger.error(f"Agent authentication failed for user {user_id}: {e}")
             raise APIError(
+                code="AGENT_AUTH_FAILED",
                 message="Agent authentication failed",
                 status_code=401,
-                error_code="AGENT_AUTH_FAILED",
             )
 
         if not signin_response or not signin_response.session:
             raise APIError(
+                code="AGENT_AUTH_NO_SESSION",
                 message="Agent authentication returned no session",
                 status_code=401,
-                error_code="AGENT_AUTH_NO_SESSION",
             )
 
         session = signin_response.session
@@ -84,6 +100,8 @@ def authenticate_agent_user(user_id: str) -> dict:
         refresh_token = session.refresh_token
         expires_in = session.expires_in or 3600
         expires_at = time.time() + expires_in
+
+        print(f"[AGENT_AUTH] Session expires in: {expires_in}s")
 
         # Cache session
         session_data = {
@@ -93,6 +111,7 @@ def authenticate_agent_user(user_id: str) -> dict:
             "agent_user_id": agent_user_id,
         }
         _agent_sessions[user_id] = session_data
+        print(f"[AGENT_AUTH] Session cached for reuse")
 
         # Update agent_last_used_at timestamp
         try:
@@ -101,10 +120,12 @@ def authenticate_agent_user(user_id: str) -> dict:
                     "agent_last_used_at": "now()",
                 }
             ).eq("id", user_id).execute()
+            print(f"[AGENT_AUTH] Updated agent_last_used_at timestamp")
         except Exception as e:
             logger.warning(f"Failed to update agent_last_used_at: {e}")
 
         logger.info(f"Agent authenticated for user {user_id}, expires in {expires_in}s")
+        print(f"[AGENT_AUTH] ========== AGENT READY FOR RLS OPERATIONS ==========")
 
         return session_data
 
@@ -113,9 +134,9 @@ def authenticate_agent_user(user_id: str) -> dict:
     except Exception as e:
         logger.error(f"Unexpected error authenticating agent: {e}")
         raise APIError(
+            code="AGENT_AUTH_ERROR",
             message="Agent authentication error",
             status_code=500,
-            error_code="AGENT_AUTH_ERROR",
         )
 
 
@@ -163,9 +184,9 @@ def get_agent_client(user_id: str) -> Client:
     except Exception as e:
         logger.error(f"Failed to create agent client: {e}")
         raise APIError(
+            code="AGENT_CLIENT_ERROR",
             message="Failed to create agent client",
             status_code=500,
-            error_code="AGENT_CLIENT_ERROR",
         )
 
 
@@ -239,7 +260,7 @@ def refresh_agent_session(user_id: str) -> dict:
     except Exception as e:
         logger.error(f"Unexpected error refreshing agent session: {e}")
         raise APIError(
+            code="AGENT_SESSION_REFRESH_ERROR",
             message="Agent session refresh error",
             status_code=500,
-            error_code="AGENT_SESSION_REFRESH_ERROR",
         )

@@ -94,26 +94,31 @@ async def signup(credentials: SignupRequest, response: Response):
         admin_client = get_admin_client()
 
         # Step 1: Create user account
+        print(f"[SIGNUP] ========== NEW USER SIGNUP INITIATED ==========")
+        print(f"[SIGNUP] Email: {credentials.email}")
         try:
-            print(f"[DEBUG] Attempting signup for: {credentials.email}")
             signup_response = admin_client.auth.sign_up(
                 {"email": credentials.email, "password": credentials.password}
             )
-            print(f"[DEBUG] Signup response: {signup_response}")
+            print(f"[SIGNUP] ✅ Human user created in auth.users")
         except Exception as e:
-            print(f"[ERROR] Signup exception: {type(e).__name__}: {str(e)}")
+            print(
+                f"[SIGNUP] ❌ Failed to create human user: {type(e).__name__}: {str(e)}"
+            )
             error_msg = str(e).lower()
             if "already registered" in error_msg or "already exists" in error_msg:
                 raise HTTPException(status_code=400, detail="Email already exists")
             raise HTTPException(status_code=500, detail=f"Signup failed: {str(e)}")
 
         if not signup_response or not signup_response.user:
+            print(f"[SIGNUP] ❌ No user returned from signup")
             raise HTTPException(status_code=500, detail="Failed to create user account")
 
         user = signup_response.user
         session = signup_response.session
 
         if not session:
+            print(f"[SIGNUP] ❌ No session returned from signup")
             raise HTTPException(
                 status_code=500, detail="No session returned from signup"
             )
@@ -122,12 +127,40 @@ async def signup(credentials: SignupRequest, response: Response):
         access_token = session.access_token
         refresh_token = session.refresh_token
         expires_in = session.expires_in or 3600
+        print(f"[SIGNUP] Human user ID: {user_id}")
+        print(f"[SIGNUP] Session expires in: {expires_in}s")
 
-        # Step 2: Generate agent credentials
+        # Step 2: Create user_profiles record
+        print(f"[SIGNUP] Creating user_profiles record...")
+        try:
+            admin_client.table("user_profiles").insert(
+                {
+                    "id": user_id,
+                    "email": user.email,
+                    "display_name": None,
+                    "avatar_url": None,
+                    "beta_access": False,
+                    "site_beta": False,
+                }
+            ).execute()
+            print(f"[SIGNUP] ✅ user_profiles record created")
+        except Exception as profile_error:
+            # Log but don't fail if profile already exists
+            print(
+                f"[SIGNUP] ⚠️  user_profiles creation failed (may already exist): {str(profile_error)}"
+            )
+
+        # Step 3: Generate agent credentials
+        print(f"[AGENT_CREATE] Generating agent credentials...")
         agent_email = generate_agent_email(user_id)
         agent_password = generate_secure_password()
+        print(f"[AGENT_CREATE] Agent email: {agent_email}")
+        print(
+            f"[AGENT_CREATE] Agent password generated (length: {len(agent_password)})"
+        )
 
-        # Step 3: Create agent-user auth account
+        # Step 4: Create agent-user auth account
+        print(f"[AGENT_CREATE] Creating agent-user in auth.users...")
         agent_user_id = None
         try:
             agent_signup_response = admin_client.auth.sign_up(
@@ -135,30 +168,44 @@ async def signup(credentials: SignupRequest, response: Response):
             )
 
             if not agent_signup_response or not agent_signup_response.user:
-                # Log warning but don't fail user signup
-                print(f"WARNING: Failed to create agent-user for user {user_id}")
+                print(f"[AGENT_CREATE] ❌ Failed to create agent-user auth account")
             else:
                 agent_user_id = agent_signup_response.user.id
-                print(f"[DEBUG] Agent user created: {agent_user_id}")
+                print(f"[AGENT_CREATE] ✅ Agent user created in auth.users")
+                print(f"[AGENT_CREATE] Agent user ID: {agent_user_id}")
         except Exception as agent_error:
-            # Log error but don't fail user signup
-            print(f"ERROR creating agent-user: {str(agent_error)}")
+            print(
+                f"[AGENT_CREATE] ❌ Exception creating agent-user: {str(agent_error)}"
+            )
 
-        # Step 4: Store agent credentials securely (only if agent was created)
+        # Step 5: Store agent credentials securely (only if agent was created)
         if agent_user_id:
+            print(f"[AGENT_CREATE] Storing encrypted credentials in user_profiles...")
             try:
                 store_agent_credentials(user_id, agent_user_id, agent_password)
-                print(f"[DEBUG] Agent credentials stored for user {user_id}")
+                print(f"[AGENT_CREATE] ✅ Agent credentials encrypted and stored")
+                print(
+                    f"[SIGNUP] ========== SIGNUP COMPLETE: Human + Agent created =========="
+                )
             except Exception as store_error:
-                print(f"ERROR storing agent credentials: {str(store_error)}")
+                print(
+                    f"[AGENT_CREATE] ❌ Failed to store credentials: {str(store_error)}"
+                )
+                print(
+                    f"[SIGNUP] ========== SIGNUP COMPLETE: Human created, Agent FAILED =========="
+                )
+        else:
+            print(
+                f"[SIGNUP] ========== SIGNUP COMPLETE: Human created, no Agent =========="
+            )
 
-        # Step 5: Calculate expiresAt timestamp
+        # Step 6: Calculate expiresAt timestamp
         expires_at = int((time.time() + expires_in) * 1000)  # Convert to epoch ms
 
-        # Step 6: Set httpOnly cookies
+        # Step 7: Set httpOnly cookies
         _set_auth_cookies(response, access_token, refresh_token, expires_in)
 
-        # Step 7: Return user data with access token
+        # Step 8: Return user data with access token
         return AuthResponse(
             user={"id": user_id, "email": user.email},
             expiresAt=expires_at,

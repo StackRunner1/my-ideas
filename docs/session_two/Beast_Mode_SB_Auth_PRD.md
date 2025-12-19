@@ -845,6 +845,145 @@ profile/metadata
 
 ---
 
+### Unit 7.5: Database Schema Migration (Core Tables with Simplified RLS)
+
+**Goal**: Create Supabase migration to establish core application tables (user_profiles, ideas, votes, comments) with simplified RLS policies suitable for demo/learning environments where agent-users need seamless access
+
+**Prerequisites**:
+
+- Unit 1 completed (Supabase client configured)
+- Understanding of Supabase migrations and RLS
+- Agent-user architecture from Unit 4 (agents authenticate separately)
+
+**Context**: This is a DEMO/LEARNING application. We implement simplified RLS where any authenticated user has full CRUD access. This allows agent-users (who authenticate with their own credentials) to access data without complex ownership checks or subqueries. For production multi-tenant systems, you would use stricter `auth.uid() = user_id` policies.
+
+**Deliverables**:
+
+**Migration File Creation**:
+
+- [ ] Create migration file: `supabase/migrations/YYYYMMDDHHMMSS_create_core_tables.sql` (use current timestamp)
+- [ ] Add migration header with description and date
+- [ ] Use `CREATE TABLE IF NOT EXISTS` for idempotency
+
+**User Profiles Table**:
+
+- [ ] Create `public.user_profiles` table:
+  - `id` UUID PRIMARY KEY (references auth.users(id) ON DELETE CASCADE)
+  - `email` TEXT NOT NULL
+  - `display_name` TEXT
+  - `avatar_url` TEXT
+  - `beta_access` BOOLEAN DEFAULT FALSE
+  - `site_beta` BOOLEAN DEFAULT FALSE
+  - `created_at` TIMESTAMPTZ DEFAULT NOW()
+  - `updated_at` TIMESTAMPTZ DEFAULT NOW()
+- [ ] Enable RLS on user_profiles
+- [ ] Create policies:
+  - "Users can view own profile" (SELECT): `auth.uid() = id`
+  - "Users can update own profile" (UPDATE): `auth.uid() = id`
+  - "Users can insert own profile" (INSERT): `auth.uid() = id`
+- [ ] Add index on email for fast lookups
+
+**Ideas Table**:
+
+- [ ] Create `public.ideas` table:
+  - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  - `user_id` UUID NOT NULL (references auth.users(id) ON DELETE CASCADE)
+  - `title` TEXT NOT NULL
+  - `description` TEXT
+  - `status` TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived'))
+  - `tags` TEXT[] (array of tags for categorization)
+  - `vote_count` INTEGER DEFAULT 0
+  - `created_at` TIMESTAMPTZ DEFAULT NOW()
+  - `updated_at` TIMESTAMPTZ DEFAULT NOW()
+- [ ] Enable RLS on ideas
+- [ ] Create SIMPLIFIED policies (note: any authenticated user has access):
+  - "Authenticated users can view all ideas" (SELECT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can create ideas" (INSERT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can update ideas" (UPDATE): `auth.uid() IS NOT NULL`
+  - "Authenticated users can delete ideas" (DELETE): `auth.uid() IS NOT NULL`
+- [ ] Add comment explaining this is simplified for demo/learning (agents need access)
+- [ ] Add indexes: user_id, status, created_at DESC, vote_count DESC
+- [ ] Add GIN index on tags array for fast searches
+
+**Votes Table**:
+
+- [ ] Create `public.votes` table:
+  - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  - `idea_id` UUID NOT NULL (references ideas(id) ON DELETE CASCADE)
+  - `user_id` UUID NOT NULL (references auth.users(id) ON DELETE CASCADE)
+  - `created_at` TIMESTAMPTZ DEFAULT NOW()
+  - UNIQUE constraint on (idea_id, user_id) - one vote per user per idea
+- [ ] Enable RLS on votes
+- [ ] Create SIMPLIFIED policies:
+  - "Authenticated users can view all votes" (SELECT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can create votes" (INSERT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can delete votes" (DELETE): `auth.uid() IS NOT NULL`
+- [ ] Add indexes: idea_id, user_id
+
+**Comments Table**:
+
+- [ ] Create `public.comments` table:
+  - `id` UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  - `idea_id` UUID NOT NULL (references ideas(id) ON DELETE CASCADE)
+  - `user_id` UUID NOT NULL (references auth.users(id) ON DELETE CASCADE)
+  - `parent_id` UUID (references comments(id) ON DELETE CASCADE) - for threaded comments
+  - `content` TEXT NOT NULL
+  - `created_at` TIMESTAMPTZ DEFAULT NOW()
+  - `updated_at` TIMESTAMPTZ DEFAULT NOW()
+- [ ] Enable RLS on comments
+- [ ] Create SIMPLIFIED policies:
+  - "Authenticated users can view all comments" (SELECT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can create comments" (INSERT): `auth.uid() IS NOT NULL`
+  - "Authenticated users can update comments" (UPDATE): `auth.uid() IS NOT NULL`
+  - "Authenticated users can delete comments" (DELETE): `auth.uid() IS NOT NULL`
+- [ ] Add indexes: idea_id, user_id, parent_id, created_at DESC
+
+**Triggers & Functions**:
+
+- [ ] Create trigger function `update_updated_at_column()` to auto-update updated_at
+- [ ] Apply trigger to user_profiles, ideas, comments tables
+- [ ] Create trigger function `sync_idea_vote_count()` to update ideas.vote_count on vote insert/delete
+- [ ] Apply vote count triggers to votes table
+
+**Table Documentation**:
+
+- [ ] Add COMMENT on ideas table explaining simplified RLS for demo/learning
+- [ ] Add COMMENT on votes table explaining simplified RLS
+- [ ] Add COMMENT on comments table explaining simplified RLS
+- [ ] Document in migration why we use `auth.uid() IS NOT NULL` instead of ownership checks
+
+**Migration Testing**:
+
+- [ ] Apply migration in Supabase dashboard SQL Editor or via Supabase CLI
+- [ ] Verify all 4 tables created: `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';`
+- [ ] Verify RLS enabled: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';`
+- [ ] Verify policies created: `SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public';`
+- [ ] Test inserting an idea as authenticated user - should succeed
+- [ ] Test querying ideas as different authenticated user - should return all ideas (not just own)
+- [ ] Verify agent-user can access ideas created by human user (both authenticated)
+
+**Success Criteria**:
+
+- Migration applies successfully without errors
+- All tables created with correct columns and constraints
+- RLS enabled on all tables with simplified policies
+- Triggers working (updated_at auto-updates, vote_count syncs)
+- Agent-users can access data created by human users (both authenticated)
+- Migration includes clear documentation explaining simplified RLS approach
+- Database ready for Session 3 CRUD operations
+
+**Important Notes**:
+
+- **This is a simplified RLS approach for demo/learning purposes**
+- In production multi-tenant apps, use stricter policies: `auth.uid() = user_id`
+- Simplified RLS allows agents to operate without complex subqueries
+- Still secure: requires authentication, not public access
+- Perfect for learning environments and proof-of-concept demos
+
+**Estimated Effort**: 2-3 hours
+
+---
+
 ### Unit 8: Agent-User Database Operations
 
 **Goal**: Enable AI agent to perform CRUD operations on behalf of user using
