@@ -1,3 +1,4 @@
+import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { PATHS } from "@/config/paths";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -32,8 +33,24 @@ export function AppRoutes() {
   // Enable automatic token refresh
   useTokenRefresh();
 
-  // Show loading spinner during auth initialization
-  if (isLoading || !isInitialized) {
+  // Show loading spinner during auth initialization (max 3 seconds)
+  // After that, render the app anyway to prevent infinite loading
+  const [forceRender, setForceRender] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isInitialized) {
+        console.warn(
+          "[AppRoutes] Auth initialization timeout - rendering app anyway"
+        );
+        setForceRender(true);
+      }
+    }, 3000); // Force render after 3 seconds
+
+    return () => clearTimeout(timer);
+  }, [isInitialized]);
+
+  if ((isLoading || !isInitialized) && !forceRender) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

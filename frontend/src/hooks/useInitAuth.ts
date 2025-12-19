@@ -108,12 +108,16 @@ export function useInitAuth(): InitAuthState {
               isLoading: false,
               error: null,
             });
-          } catch (refreshError) {
+          } catch (refreshError: any) {
             // Refresh failed - no valid refresh_token cookie or token invalid
             // This is expected for users who have never logged in
-            // Clear any stale Redux state and continue as guest
+            // Also handles backend timeouts/unavailability gracefully
             if (!isMounted) return;
 
+            console.log(
+              "[useInitAuth] Refresh failed (expected for new users):",
+              refreshError.message
+            );
             dispatch(clearSession());
 
             setState({

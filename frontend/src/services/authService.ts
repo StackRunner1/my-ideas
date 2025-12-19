@@ -47,12 +47,24 @@ export async function signup(
   credentials: SignupCredentials
 ): Promise<AuthResponse> {
   try {
+    // Use shorter timeout for auth requests (10 seconds)
     const response = await apiClient.post<AuthResponse>(
       "/api/v1/auth/signup",
-      credentials
+      credentials,
+      { timeout: 10000 }
     );
     return response.data;
   } catch (error: any) {
+    // Handle timeout specifically
+    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      throw new Error(
+        "Signup request timed out. Please check your connection and try again."
+      );
+    }
+    // Handle network errors
+    if (!error.response) {
+      throw new Error("Cannot reach server. Please check your connection.");
+    }
     const message = error.response?.data?.detail || "Signup failed";
     throw new Error(message);
   }
@@ -69,12 +81,24 @@ export async function login(
   credentials: LoginCredentials
 ): Promise<AuthResponse> {
   try {
+    // Use shorter timeout for auth requests (10 seconds)
     const response = await apiClient.post<AuthResponse>(
       "/api/v1/auth/login",
-      credentials
+      credentials,
+      { timeout: 10000 }
     );
     return response.data;
   } catch (error: any) {
+    // Handle timeout specifically
+    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      throw new Error(
+        "Login request timed out. Please check your connection and try again."
+      );
+    }
+    // Handle network errors
+    if (!error.response) {
+      throw new Error("Cannot reach server. Please check your connection.");
+    }
     const message = error.response?.data?.detail || "Login failed";
     throw new Error(message);
   }
@@ -134,6 +158,21 @@ export async function checkAuthStatus(): Promise<UserData | null> {
     if (error.response?.status === 401) {
       return null;
     }
+
+    // Network errors, timeouts, or backend unavailable - treat as not authenticated
+    // This prevents the app from hanging when backend is slow/unreachable
+    if (
+      !error.response ||
+      error.code === "ECONNABORTED" ||
+      error.message?.includes("timeout")
+    ) {
+      console.warn(
+        "[authService] Backend unavailable or timeout, treating as unauthenticated:",
+        error.message
+      );
+      return null;
+    }
+
     throw error;
   }
 }
