@@ -130,15 +130,25 @@ async def query_database(
                 {"role": msg.role, "content": msg.content}
                 for msg in query_request.conversation_history
             ]
-            logger.info(f"[AI_ENDPOINT] 📜 Received {len(history)} conversation history messages")
+            logger.info(
+                f"[AI_ENDPOINT] 📜 Received {len(history)} conversation history messages"
+            )
             for i, msg in enumerate(history):
-                preview = msg['content'][:100] + '...' if len(msg['content']) > 100 else msg['content']
-                logger.info(f"[AI_ENDPOINT]   Message {i+1}/{len(history)}: {msg['role']} - {preview}")
+                preview = (
+                    msg["content"][:100] + "..."
+                    if len(msg["content"]) > 100
+                    else msg["content"]
+                )
+                logger.info(
+                    f"[AI_ENDPOINT]   Message {i+1}/{len(history)}: {msg['role']} - {preview}"
+                )
         else:
             logger.info("[AI_ENDPOINT] ⚠️ No conversation history provided")
-        
+
         logger.info(f"[AI_ENDPOINT] 💬 Current query: {query_request.query}")
-        logger.info(f"[AI_ENDPOINT] ⚙️ Settings: temp={temperature}, max_tokens={max_tokens}")
+        logger.info(
+            f"[AI_ENDPOINT] ⚙️ Settings: temp={temperature}, max_tokens={max_tokens}"
+        )
 
         # Process query request
         result = process_query_request(

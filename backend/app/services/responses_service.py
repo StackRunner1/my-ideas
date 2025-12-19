@@ -102,7 +102,9 @@ For general questions (greetings, help, etc.):
         logger.info(
             f"[RESPONSES_API] Processing query with {len(messages)} messages (including {len(conversation_history or [])} history)"
         )
-        logger.info(f"[RESPONSES_API] Settings: temp={temperature}, max_tokens={max_tokens}")
+        logger.info(
+            f"[RESPONSES_API] Settings: temp={temperature}, max_tokens={max_tokens}"
+        )
 
         # ===== TURN 1: Initial LLM call with tools =====
         response = client.responses.create(

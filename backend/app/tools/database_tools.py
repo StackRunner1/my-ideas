@@ -165,9 +165,13 @@ def execute_query_database(
         if order_match:
             order_col = order_match.group(1)
             order_dir = order_match.group(2)
-            logger.info(f"[TOOL:query_database] 🔍 ORDER BY detected: column={order_col}, direction={order_dir}")
+            logger.info(
+                f"[TOOL:query_database] 🔍 ORDER BY detected: column={order_col}, direction={order_dir}"
+            )
             if order_dir and order_dir.upper() == "DESC":
-                logger.info(f"[TOOL:query_database] 📊 Applying .order('{order_col}', desc=True)")
+                logger.info(
+                    f"[TOOL:query_database] 📊 Applying .order('{order_col}', desc=True)"
+                )
                 query = query.order(order_col, desc=True)
             else:
                 logger.info(f"[TOOL:query_database] 📊 Applying .order('{order_col}')")

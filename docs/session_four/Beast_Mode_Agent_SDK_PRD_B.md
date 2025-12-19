@@ -2,29 +2,242 @@
 
 ## Overview
 
-This document details **Part B: Agent SDK Implementation** - the autonomous agentic system built upon the OpenAI Responses API foundation established in Part A.
+This document details **Part B: Agent SDK Implementation** - the autonomous agentic system built **ALONGSIDE** (not replacing) the OpenAI Responses API foundation established in Part A.
 
-**What This Adds**: Tool-calling agents with multi-specialist architecture, orchestration patterns, decision boundaries, and autonomous database operations - transforming the chat interface from structured query generation to intelligent, autonomous task execution.
+## CRITICAL: Dual-System Architecture Strategy
+
+**⚠️ IMPORTANT FOR AI CODING ASSISTANTS**: This implementation creates **TWO SEPARATE, INDEPENDENT AI SYSTEMS** that run in parallel:
+
+### System 1: Responses API (Part A - Already Complete ✅)
+
+- **Backend**: `POST /api/v1/ai/query` endpoint (already implemented)
+- **Purpose**: Conversational queries, database SELECT operations, SQL generation
+- **Pattern**: User asks question → LLM generates SQL → Execute query → Return results
+- **State**: SELECT-only, read-only operations
+- **Use Cases**: "Show me all items", "Analyze my data", "What tags do I have?"
+
+### System 2: Agent SDK (Part B - To Implement 🚧)
+
+- **Backend**: `POST /api/v1/agent/chat` endpoint (new, separate endpoint)
+- **Purpose**: Autonomous actions, CRUD operations, multi-specialist orchestration
+- **Pattern**: User instructs → Orchestrator routes → Specialist executes tools → Confirmation
+- **State**: Full CRUD with autonomous decision-making
+- **Use Cases**: "Create item X", "Tag Y with Z", "Delete old items"
+
+### Shared Infrastructure (Reuse from Part A)
+
+- **Frontend Components**: Floating drawer, message cards, Redux patterns
+- **Backend Infrastructure**: Agent-user authentication, RLS enforcement, OpenAI SDK setup
+- **UI Pattern**: Single floating chat drawer with **prominent mode toggle at top**
+
+### User Experience Flow
+
+```
+User clicks floating chat button
+    ↓
+Drawer opens with MODE TOGGLE at top
+    ↓
+┌─────────────────────────────────────┐
+│  [Ask Questions] [Take Actions]    │ ← Mode Toggle (Segmented Control/Tabs)
+├─────────────────────────────────────┤
+│                                     │
+│  Chat messages here...              │
+│                                     │
+└─────────────────────────────────────┘
+
+Mode 1: "Ask Questions" (Responses API)
+  - Calls /api/v1/ai/query
+  - Shows SQL queries and results
+  - Read-only operations
+
+Mode 2: "Take Actions" (Agent SDK)
+  - Calls /api/v1/agent/chat
+  - Shows agent reasoning, tool calls, confirmations
+  - Full CRUD operations
+```
+
+### Implementation Strategy
+
+1. **Keep Part A intact** - Do NOT modify existing Responses API implementation
+2. **Add Part B separately** - New agent endpoint, new Redux state/actions, new components
+3. **Reuse UI shell** - Same drawer, shared message components extended for agent actions
+4. **Clear mode distinction** - Prominent toggle, different visual styling, mode-specific hints
+5. **Independent operation** - Each system works completely independently
+
+### Why This Approach?
+
+This is a **demo/learning tool** for teaching non-technical users how to code with AI assistance. Having both systems accessible side-by-side demonstrates:
+
+- Different AI interaction patterns (ask vs instruct)
+- Structured outputs vs autonomous agents
+- Read-only vs write operations
+- Simple vs complex AI architectures
+
+**What This Adds**: Tool-calling agents with multi-specialist architecture, orchestration patterns, decision boundaries, and autonomous database operations - adding a second AI interaction mode alongside the existing conversational query system.
 
 **Architecture**: Multi-specialist agent system where:
+
 - **Orchestrator Agent** routes user requests to appropriate specialists
 - **Specialist Agents** (Items, Tags) execute domain-specific operations with custom tools
 - **Tool Execution** happens via RLS-enforced agent-user clients ensuring security
-- **Chat Interface** extended to display agent actions, tool calls, and confidence scores
+- **Chat Interface** extended with mode toggle and agent-specific displays (actions, tool calls, confidence scores)
 
 ## Prerequisites
 
-**CRITICAL**: Part A (Responses API) MUST be complete before starting Part B.
+**MANDATORY**: Part A (Responses API) MUST be complete before starting Part B. There is no alternative path.
 
-**From Part A** (Beast_Mode_OARAPI_PRD1.md):
+**From Part A** (Beast_Mode_OARAPI_PRD_A.md) - All Required:
+
 - ✅ OpenAI SDK configured and tested (Phase 1, Units 1-5)
-- ✅ Agent-user authentication working with encrypted credentials
-- ✅ Responses API endpoints functional with RLS enforcement
-- ✅ Chat interface operational with Redux state management
+- ✅ Agent-user authentication working with encrypted credentials (Units 3-4)
+- ✅ Responses API endpoints functional with RLS enforcement (Units 7-8)
+- ✅ Chat interface operational with Redux state management (Units 9-11)
+- ✅ Floating drawer UI implemented (Unit 13)
 - ✅ All Phase 1-3 validation tests passing
 
 **Additional Requirements**:
+
 - Understanding of OpenAI function calling and tool execution patterns
+
+## Required Reading: OpenAI Agent SDK Documentation
+
+**⚠️ CRITICAL FOR AI CODING ASSISTANTS**: Before implementing Part B, you MUST thoroughly read and understand the official OpenAI Agent SDK documentation. This framework is relatively new and may not be fully represented in training data.
+
+### Primary Documentation Links
+
+1. **OpenAI Agents SDK Python API Reference** (PRIMARY RESOURCE):
+
+   - URL: https://openai.github.io/openai-agents-python/
+   - Purpose: Complete API documentation, usage patterns, examples
+   - Key Sections:
+     - [Installation and Quickstart](https://openai.github.io/openai-agents-python/quickstart/)
+     - [Agents](https://openai.github.io/openai-agents-python/agents/) - Core Agent primitives
+     - [Running Agents](https://openai.github.io/openai-agents-python/running_agents/) - Runner.run_sync/async patterns
+     - [Tools](https://openai.github.io/openai-agents-python/tools/) - Function-to-tool conversion
+     - [Handoffs](https://openai.github.io/openai-agents-python/handoffs/) - Multi-agent coordination
+     - [Sessions](https://openai.github.io/openai-agents-python/sessions/) - Conversation history management
+     - [Multi-Agent Orchestration](https://openai.github.io/openai-agents-python/multi_agent/)
+     - [Tracing](https://openai.github.io/openai-agents-python/tracing/) - Debugging and monitoring
+
+2. **OpenAI Platform Agents Guide**:
+
+   - URL: https://platform.openai.com/docs/guides/agents
+   - Purpose: High-level overview, AgentKit ecosystem, deployment patterns
+   - Focus: Understanding agent workflows, tools, and optimization
+
+3. **OpenAI Platform Agents SDK Guide**:
+
+   - URL: https://platform.openai.com/docs/guides/agents-sdk
+   - Purpose: SDK introduction, download links, documentation navigation
+   - Focus: Getting started with the SDK
+
+4. **GitHub Repository**:
+   - URL: https://github.com/openai/openai-agents-python
+   - Purpose: Source code, examples, issues, changelog
+   - Focus: Real-world examples, community issues, latest updates
+
+### Key Concepts from Documentation
+
+From the SDK documentation, understand these core primitives:
+
+1. **Agent** - LLM equipped with instructions and tools
+
+   ```python
+   from agents import Agent, Runner
+
+   agent = Agent(
+       name="Assistant",
+       instructions="You are a helpful assistant",
+       tools=[...],  # Function tools
+       handoffs=[...]  # Other agents this can delegate to
+   )
+   ```
+
+2. **Runner** - Executes agent loop (call tools → send results → loop until done)
+
+   ```python
+   result = Runner.run_sync(agent, "user query")
+   print(result.final_output)
+   ```
+
+3. **Tools** - Any Python function becomes a tool with automatic schema generation
+
+   ```python
+   def create_tag(tag_name: str) -> dict:
+       """Create a new tag."""
+       # Implementation
+       return {"success": True}
+
+   agent = Agent(tools=[create_tag])  # Automatic schema generation
+   ```
+
+4. **Handoffs** - Agents delegate to specialists
+
+   ```python
+   items_agent = Agent(name="Items", tools=[create_item, ...])
+   tags_agent = Agent(name="Tags", tools=[create_tag, ...])
+
+   orchestrator = Agent(
+       name="Orchestrator",
+       handoffs=[items_agent, tags_agent]
+   )
+   ```
+
+5. **Sessions** - Automatic conversation history management
+
+   ```python
+   from agents.memory import InMemorySession
+
+   session = InMemorySession()
+   result1 = Runner.run_sync(agent, "First query", session=session)
+   result2 = Runner.run_sync(agent, "Follow-up", session=session)  # Has context
+   ```
+
+6. **Tracing** - Built-in debugging and monitoring
+   - Visualize agent decision-making
+   - Debug tool execution
+   - Monitor performance
+
+### Implementation Requirements
+
+**Before writing ANY code for Part B**:
+
+1. ✅ Read the [Quickstart guide](https://openai.github.io/openai-agents-python/quickstart/)
+2. ✅ Study [Tools documentation](https://openai.github.io/openai-agents-python/tools/) - understand function-to-tool patterns
+3. ✅ Review [Handoffs documentation](https://openai.github.io/openai-agents-python/handoffs/) - multi-agent coordination
+4. ✅ Understand [Sessions](https://openai.github.io/openai-agents-python/sessions/) - conversation history
+5. ✅ Review [Multi-Agent Orchestration](https://openai.github.io/openai-agents-python/multi_agent/) - specialist patterns
+6. ✅ Check [Examples](https://openai.github.io/openai-agents-python/examples/) - real-world patterns
+
+**Why This Matters**:
+
+- The Agent SDK has specific patterns for tool calling (different from Responses API)
+- Handoffs are a first-class primitive (not custom orchestration logic)
+- Sessions handle conversation history automatically (different from Part A manual approach)
+- The SDK's `Runner` handles the agent loop (we don't implement it ourselves)
+- Tool schema generation is automatic via Pydantic (simpler than Part A)
+
+**Implementation Approach**:
+
+1. Follow SDK patterns exactly as documented
+2. Use `Agent`, `Runner`, `handoffs` primitives as intended
+3. Leverage automatic tool schema generation
+4. Use Sessions for conversation history (don't reinvent)
+5. Enable tracing for debugging
+6. Adapt patterns to our FastAPI/Supabase/Redux architecture
+
+### Documentation Integration Points
+
+When implementing specific units, refer to:
+
+- **Unit 15 (Tool Base Class)**: [Tools documentation](https://openai.github.io/openai-agents-python/tools/)
+- **Unit 16 (Agent Models)**: [Agents documentation](https://openai.github.io/openai-agents-python/agents/)
+- **Unit 17 (Specialist Agents)**: [Handoffs](https://openai.github.io/openai-agents-python/handoffs/) + [Multi-Agent](https://openai.github.io/openai-agents-python/multi_agent/)
+- **Unit 18 (Orchestrator)**: [Running Agents](https://openai.github.io/openai-agents-python/running_agents/) + [Sessions](https://openai.github.io/openai-agents-python/sessions/)
+- **Unit 19 (Agent Endpoint)**: [API Reference](https://openai.github.io/openai-agents-python/ref/)
+
+---
+
 - Familiarity with orchestration and delegation patterns
 - Python abstract base classes and inheritance
 
@@ -47,7 +260,139 @@ Part B implements:
 
 ## AI Coding Agent Instructions
 
-**Continuation Context**: This PRD continues from Beast_Mode_OARAPI_PRD1.md (Part A: Responses API). All infrastructure from Part A is assumed working.
+**CRITICAL IMPLEMENTATION STRATEGY FOR AI ASSISTANTS**:
+
+This PRD implements a **dual-system architecture** where Part B (Agent SDK) runs **ALONGSIDE** Part A (Responses API) as completely separate systems. Both coexist with minimal shared state.
+
+### Separation of Concerns - What MUST Be Separate
+
+**Backend Files (Do NOT Modify Part A Files)**:
+
+- ✅ **NEW endpoint file**: `backend/app/api/routes/agent.py`
+  - Do NOT add agent endpoints to existing `ai.py`
+  - Agent SDK gets its own route file: `POST /api/v1/agent/chat`
+- ✅ **NEW service directory**: `backend/app/services/agents/`
+  - Create separate directory for orchestrator and specialist agents
+  - Do NOT mix with `responses_service.py` from Part A
+- ✅ **NEW models file**: `backend/app/models/agent.py`
+  - Agent-specific Pydantic models (AgentAction, AgentResponse, etc.)
+  - Keep separate from `responses_api.py` models
+- ✅ **NEW tools directory**: `backend/app/services/tools/` (if creating Tool base class)
+  - Part A uses simple functional approach in `app/tools/database_tools.py`
+  - Part B MAY create OOP tool pattern in separate location
+
+**Frontend Files (Do NOT Modify Part A Redux State)**:
+
+- ✅ **NEW Redux slice**: `frontend/src/store/agentSlice.ts`
+  - Do NOT extend or modify existing `chatSlice.ts` from Part A
+  - Completely separate state management for Agent SDK
+  - Agent state: messages, agentStatus, currentAction, toolResults, etc.
+- ✅ **NEW service file**: `frontend/src/services/agentService.ts`
+  - Calls `/api/v1/agent/chat` endpoint
+  - Do NOT add agent methods to existing `chatService.ts`
+- ✅ **NEW components** (agent-specific):
+  - `ActionBadge.tsx`, `ToolResultCard.tsx`, `ConfirmationDialog.tsx`, `ThinkingIndicator.tsx`
+  - Can extend existing `MessageCard.tsx` but keep agent rendering logic separate
+
+### What CAN Be Shared (Reuse Existing Infrastructure)
+
+**Backend Shared**:
+
+- ✅ Agent-user authentication services (already implemented in Part A)
+- ✅ OpenAI SDK client setup and helpers
+- ✅ RLS enforcement patterns
+- ✅ Logging utilities (`core/logging.py`)
+- ✅ Rate limiting patterns (create separate state for agent endpoints)
+
+**Frontend Shared**:
+
+- ✅ Floating drawer shell component (`ChatDrawer.tsx`)
+- ✅ Base message display components (can extend for agent messages)
+- ✅ shadcn/ui components
+- ✅ Root store configuration (imports both `chatSlice` and `agentSlice`)
+
+### Mode Toggle Implementation Pattern
+
+The chat drawer contains BOTH systems accessed via a mode toggle:
+
+```typescript
+// In ChatInterface or ChatDrawer component
+const [mode, setMode] = useState<"responses" | "agent">("responses");
+
+// Mode determines which Redux slice and API to use
+const handleSendMessage = (message: string) => {
+  if (mode === "responses") {
+    dispatch(sendQuery(message)); // chatSlice from Part A
+  } else {
+    dispatch(sendAgentMessage(message)); // agentSlice from Part B
+  }
+};
+```
+
+### File Organization Summary
+
+```
+backend/
+  app/
+    api/routes/
+      ai.py              ← Part A (existing, do not modify)
+      agent.py           ← Part B (NEW)
+    services/
+      responses_service.py   ← Part A (existing, do not modify)
+      app_agents/           ← Part B (NEW directory - MUST be app_agents NOT agents)
+        __init__.py
+        orchestrator.py
+        ideas_agent.py
+        tags_agent.py
+        prompts.py
+      tools/              ← Part B (NEW, if using OOP tools)
+        __init__.py
+        base.py
+        create_tag.py
+    models/
+      responses_api.py    ← Part A (existing, do not modify)
+      agent.py           ← Part B (NEW)
+    tools/
+      database_tools.py  ← Part A (existing, functional approach)
+
+frontend/
+  src/
+    store/
+      chatSlice.ts       ← Part A (existing, do not modify)
+      agentSlice.ts      ← Part B (NEW)
+    services/
+      chatService.ts     ← Part A (existing, do not modify)
+      agentService.ts    ← Part B (NEW)
+    components/chat/
+      ChatInterface.tsx  ← Shared (extend with mode toggle)
+      ChatDrawer.tsx     ← Shared (hosts both modes)
+      MessageCard.tsx    ← Shared (extend for agent messages)
+      ActionBadge.tsx    ← Part B (NEW)
+      ToolResultCard.tsx ← Part B (NEW)
+      ConfirmationDialog.tsx ← Part B (NEW)
+      ThinkingIndicator.tsx  ← Part B (NEW)
+```
+
+### Why This Separation Matters
+
+1. **Modularity**: Each system can be understood, tested, and modified independently
+2. **Clear boundaries**: No confusion about which code belongs to which system
+3. **Maintainability**: Changes to Agent SDK don't risk breaking Responses API
+4. **Learning path**: Learners can clearly see the progression from Part A to Part B
+5. **Future extensibility**: Easy to add Part C (e.g., multi-modal agents) without tangling code
+
+### Implementation Workflow for AI Assistants
+
+1. **Verify Part A complete**: Check that all Part A files exist and tests pass
+2. **Create Part B structure**: New files only, no modifications to Part A files
+3. **Implement backend first**: Agent endpoint → Specialists → Tools → Tests
+4. **Implement frontend second**: Agent slice → Service → Components → Integration
+5. **Integration point**: Mode toggle in shared ChatDrawer component
+6. **Testing**: Verify both systems work independently and mode toggle switches correctly
+
+---
+
+**Continuation Context**: This PRD continues from Beast_Mode_OARAPI_PRD_A.md (Part A: Responses API). All infrastructure from Part A is assumed working and must not be modified during Part B implementation.
 
 - **AI PROMPT markers**: Phase-level prompts (### AI PROMPT) consolidate all units in that phase
 - **PAUSE markers**: Checkpoints for learner approval before proceeding
@@ -56,16 +401,23 @@ Part B implements:
 
 ## Architecture Extension
 
-### Agent SDK vs Responses API
+### Dual-System Comparison
 
-| Aspect | Responses API (Part A) | Agent SDK (Part B) |
-|--------|------------------------|-------------------|
-| **Interaction** | User asks → AI generates SQL → Results | User instructs → Agent decides → Tools execute → Confirmation |
-| **Autonomy** | None (generates queries only) | High (makes decisions, calls tools) |
-| **Tools** | N/A | Custom + built-in (web search) |
-| **Decision Making** | None | Confidence thresholds, safety checks |
-| **Orchestration** | Single endpoint | Multi-specialist with routing |
-| **Use Cases** | "Show me X", "Analyze Y" | "Create item Z", "Tag A with B" |
+| Aspect                  | Responses API (Part A) ✅              | Agent SDK (Part B) 🚧                                         |
+| ----------------------- | -------------------------------------- | ------------------------------------------------------------- |
+| **Backend Endpoint**    | `POST /api/v1/ai/query`                | `POST /api/v1/agent/chat`                                     |
+| **Frontend Mode**       | "Ask Questions" toggle mode            | "Take Actions" toggle mode                                    |
+| **Interaction**         | User asks → AI generates SQL → Results | User instructs → Agent decides → Tools execute → Confirmation |
+| **Autonomy**            | None (generates queries only)          | High (makes decisions, calls tools)                           |
+| **Database Operations** | SELECT only (read-only)                | Full CRUD (create, update, delete)                            |
+| **Tools**               | query_database function                | Custom tools + web search                                     |
+| **Decision Making**     | None (always generates SQL)            | Confidence thresholds, safety checks                          |
+| **Orchestration**       | Single endpoint, direct response       | Multi-specialist with routing                                 |
+| **Use Cases**           | "Show me X", "Analyze Y"               | "Create item Z", "Tag A with B"                               |
+| **State Management**    | chatSlice (responses mode)             | chatSlice (agent mode) - extended                             |
+| **UI Components**       | Shared drawer, mode toggle OFF         | Shared drawer, mode toggle ON                                 |
+
+**IMPLEMENTATION NOTE**: Both systems coexist. User toggles between them in the same chat drawer. Redux state tracks which mode is active and routes to appropriate API endpoint.
 
 ### Multi-Specialist Agent Architecture
 
@@ -100,6 +452,7 @@ Part B implements:
 ```
 
 **Architecture Flow**:
+
 1. User sends message to Orchestrator Agent
 2. Orchestrator analyzes intent and routes to appropriate specialist
 3. Specialist Agent receives request and decides which tool to use
@@ -107,6 +460,7 @@ Part B implements:
 5. Results flow back: Tool → Specialist → Orchestrator → User
 
 **Example User Flow**:
+
 ```
 User: "Create a new item called 'Learn Rust' and tag it with 'programming'"
   │
@@ -133,6 +487,13 @@ Orchestrator: Detects compound request (item creation + tagging)
 ---
 
 ## Phase 4: Tool Specification & Base Agent Infrastructure (Units 15-18)
+
+**⚠️ CRITICAL FOR AI ASSISTANTS:**
+
+- Folder MUST be `backend/app/services/app_agents/` (NOT `agents/` - conflicts with openai-agents package)
+- Import: `from agents import Agent, Runner` (package name is `agents`, NOT `openai_agents`)
+- Database table: `ideas` (NOT `items` - terminology must match database schema)
+- Tool pattern: Functional (NOT OOP base class - simpler for this project)
 
 ### AI PROMPT: Phase 4 Implementation (Units 15-18)
 
@@ -180,10 +541,10 @@ Help me implement Phase 4 - Tool Specification & Base Agent Infrastructure (Unit
 34. Document all models with usage examples
 
 **Unit 18 - Agent System Prompts**
-35. Create backend/app/services/agents/prompts.py module
-36. Define ITEMS_SPECIALIST_PROMPT including role, available tools, decision guidelines (confidence >= 0.8 → execute, < 0.8 → clarify), constraints (RLS enforcement, user data only), response format requirements
-37. Define TAGS_SPECIALIST_PROMPT including role, available tools (create_tag), special behavior (confirm before deletions), decision guidelines, response format
-38. Define ORCHESTRATOR_PROMPT including routing role, specialist descriptions (Items vs Tags), routing keywords and patterns, fallback behavior (answer simple questions directly), response format
+35. Create backend/app/services/app_agents/prompts.py module (MUST be app_agents folder)
+36. Define IDEAS_AGENT_INSTRUCTIONS including role, available tools, decision guidelines, constraints (RLS enforcement), response format
+37. Define TAGS_AGENT_INSTRUCTIONS including role, available tools (create_tag), special behavior, decision guidelines, response format
+38. Define ORCHESTRATOR_INSTRUCTIONS including routing role, specialist descriptions (Ideas vs Tags), routing patterns, fallback behavior
 39. Add prompt version identifiers for tracking and A/B testing
 40. Include few-shot examples in each prompt (3-5 examples of expected behavior)
 41. Document prompt engineering rationale and iteration history
@@ -211,145 +572,233 @@ After implementation:
 Mark completed tasks with [x]. Wait for approval before proceeding to Phase 5.
 ```
 
-### Unit 15: Tool Base Class & Contract Pattern
+### Unit 15-16: Functional Tool Implementation (Simplified from OOP Base Class Pattern)
 
-- [ ] Create `backend/app/services/tools/base.py` module
-- [ ] Define `Tool` abstract base class with properties: name, description, parameters_schema
-- [ ] Define abstract `execute(agent_client, **params)` method signature
-- [ ] Define abstract `validate_parameters(**params)` method for parameter validation
-- [ ] Implement `to_openai_function_schema()` method converting tool to OpenAI function calling format
-- [ ] Define `ToolResult` dataclass for standardized tool execution responses with success status, data, errors
-- [ ] Create `ToolExecutionError` custom exception for tool failures
-- [ ] Add logging helper methods for tool invocation tracking
-- [ ] Document tool contract requirements in docstrings
-- [ ] Write tests for base class utility methods
+**DECISION**: Using functional tool pattern instead of OOP base class for simplicity and alignment with OpenAI Agent SDK's automatic schema generation from Python functions.
 
-### Unit 16: create_tag Tool Implementation
-
-- [ ] Create `backend/app/services/tools/create_tag.py` module
-- [ ] Define `CreateTagTool` class inheriting from `Tool` base class
-- [ ] Implement name, description, and parameters_schema properties
-- [ ] Implement `validate_parameters()` checking tag_name (required string) and item_id (optional int)
-- [ ] Implement `execute(agent_client, tag_name, item_id=None)` method
-- [ ] Validate tag_name format (alphanumeric, hyphens, underscores, max 50 chars)
-- [ ] If item_id provided, verify item exists and user has access via agent_client
-- [ ] Create tag using `agent_client.from_("tags").insert()`
-- [ ] If item_id provided, link tag to item via item_tags junction table
-- [ ] Return `ToolResult` with created tag data
-- [ ] Handle errors: duplicate tag names, invalid item_id, RLS violations
-- [ ] Add comprehensive logging for all operations
+- [x] Create `backend/app/services/tools/create_tag.py` module
+- [x] Implement `create_tag()` function with type hints for automatic schema generation
+- [x] Accept `agent_client` parameter for RLS enforcement
+- [x] Function signature: `create_tag(agent_client: Client, tag_name: str, idea_id: Optional[int] = None) -> dict`
+- [x] Validate tag_name format (alphanumeric, hyphens, underscores, max 50 chars)
+- [x] If idea*id provided, verify idea exists using `agent_client.from*("ideas").select()`
+- [x] Create tag using `agent_client.from_("tags").insert()`
+- [x] If idea_id provided, link tag to idea via `idea_tags` junction table
+- [x] Return dict with success status and created tag data
+- [x] Handle errors: duplicate tag names, invalid idea_id, RLS violations
+- [x] Add comprehensive logging for all operations
 - [ ] Write tests: valid creation, duplicates, invalid inputs, RLS enforcement
 - [ ] Write integration test with Supabase
+
+**Note**: OOP Tool base class (Unit 15) skipped in favor of functional approach. OpenAI Agent SDK automatically generates function schemas from Python function signatures and docstrings, making a base class unnecessary for this project scope.
 
 ### Unit 17: Pydantic Models for Agent Responses
 
 - [ ] Create `backend/app/models/agent.py` module
 - [ ] Define `AgentAction` enum with values: answer, tool_call, clarify, refuse
-- [ ] Define `AgentResponse` model with fields: action, message, rationale, tool_name, tool_params, confidence, needs_confirmation
-- [ ] Define `ToolExecutionResult` model with fields: tool_name, success, data, error, execution_time_ms
-- [ ] Define `ConversationMessage` model with fields: role, content, timestamp, metadata
-- [ ] Define `ConversationContext` model with fields: user_id, conversation_id, messages, agent_user_id
-- [ ] Add validators for confidence score (0.0-1.0 range)
-- [ ] Implement `to_openai_format()` methods for OpenAI API compatibility
+- [ ] Define `AgentChatRequest` model with fields: query (str), session_id (Optional[str])
+- [ ] Define `AgentChatResponse` model with fields: response (str), session_id (str), actions (List), metadata (Optional[dict])
+- [ ] Add model validation and examples in docstrings
 - [ ] Write model validation tests
 - [ ] Document all models with usage examples
 
+**Note**: Simplified from original PRD specs. OpenAI Agent SDK handles most response formatting internally via Runner. We only need request/response models for FastAPI endpoint contract.
+
 ### Unit 18: Agent System Prompts
 
-- [ ] Create `backend/app/services/agents/prompts.py` module
-- [ ] Define `ITEMS_SPECIALIST_PROMPT` including role, available tools, decision guidelines, constraints, response format
-- [ ] Define `TAGS_SPECIALIST_PROMPT` including role, available tools, special behavior, decision guidelines, response format
-- [ ] Define `ORCHESTRATOR_PROMPT` including routing role, specialist descriptions, routing patterns, fallback behavior
-- [ ] Add prompt version identifiers for tracking and A/B testing
-- [ ] Include few-shot examples in each prompt (3-5 examples of expected behavior)
-- [ ] Document prompt engineering rationale and iteration history
+- [x] Create `backend/app/services/app_agents/prompts.py` module
+- [x] Define `IDEAS_AGENT_INSTRUCTIONS` including role, available tools, decision guidelines, constraints, response format
+- [x] Define `TAGS_AGENT_INSTRUCTIONS` including role, available tools (create_tag), special behavior, decision guidelines, response format
+- [x] Define `ORCHESTRATOR_INSTRUCTIONS` including routing role, specialist descriptions (Ideas vs Tags), routing patterns, fallback behavior
+- [x] Add prompt version identifiers for tracking (PROMPT_VERSION = "1.0.0")
+- [x] Include few-shot examples in each prompt (3-5 examples of expected behavior)
+- [x] Document prompts with clear formatting and guidelines
 - [ ] Create prompt testing utilities for validation
 - [ ] Write tests verifying prompts produce expected structured outputs
 
+**Status**: Core prompts implemented. Testing utilities pending.
+
+### Unit 19: Ideas Specialist Agent Implementation
+
+- [x] Create `backend/app/services/app_agents/ideas_agent.py` module
+- [x] Import: `from agents import Agent` (package name is `agents`)
+- [x] Import: `from .prompts import IDEAS_AGENT_INSTRUCTIONS`
+- [x] Define `create_ideas_agent()` factory function
+- [x] Configure Agent with name="Ideas" and IDEAS_AGENT_INSTRUCTIONS
+- [x] Export singleton `ideas_agent` instance for reuse
+- [ ] Register tools: create_idea, search_ideas, update_idea, delete_idea (placeholders for future)
+- [ ] Implement tool wrapper functions with agent_client closure
+- [ ] Add comprehensive logging for agent decisions
+- [ ] Write agent tests: tool execution, routing behavior
+
+**Status**: Agent structure created. Tool implementations pending.
+
+### Unit 20: Tags Specialist Agent Implementation
+
+- [x] Create `backend/app/services/app_agents/tags_agent.py` module
+- [x] Import: `from agents import Agent`
+- [x] Import: `from ..tools import create_tag` (relative import from services/tools)
+- [x] Import: `from .prompts import TAGS_AGENT_INSTRUCTIONS`
+- [x] Define `create_tags_agent(agent_client)` factory function
+- [x] Configure Agent with name="Tags" and TAGS_AGENT_INSTRUCTIONS
+- [x] Register create_tag tool with agent_client closure
+- [ ] Register additional tools: search_tags, link_tag, unlink_tag
+- [x] Implement tool wrapper binding agent_client to create_tag
+- [x] Add docstrings for all tool wrappers
+- [ ] Write agent tests: tag creation, tag search, tag linking
+
+**Status**: Core agent + create_tag tool implemented. Additional tools pending.
+
+### Unit 21: Orchestrator Agent Implementation
+
+- [x] Create `backend/app/services/app_agents/orchestrator.py` module
+- [x] Import: `from agents import Agent`
+- [x] Import: `from .ideas_agent import create_ideas_agent`
+- [x] Import: `from .tags_agent import create_tags_agent`
+- [x] Import: `from .prompts import ORCHESTRATOR_INSTRUCTIONS`
+- [x] Define `create_orchestrator(agent_client)` factory function
+- [x] Configure Agent with name="Orchestrator" and ORCHESTRATOR_INSTRUCTIONS
+- [x] Initialize Ideas and Tags specialist agents
+- [x] Configure handoffs to both specialists
+- [x] Add comprehensive docstrings explaining architecture
+- [ ] Add session management for conversation continuity
+- [ ] Write tests: routing decisions, handoff behavior, fallback handling
+
+**Status**: Core orchestrator implemented with handoffs. Session management pending.
+
+### Unit 22: Agent SDK Backend Endpoint
+
+- [x] Create `POST /api/v1/agent/chat` endpoint in `backend/app/api/routes/agent.py`
+- [x] Import: `from agents import Runner, SQLiteSession` (NOT openai_agents)
+- [x] Import: `from ...services.app_agents import create_orchestrator`
+- [x] Import: `from ...services.agent_auth import get_agent_client`
+- [x] Implement `AgentChatRequest` and `AgentChatResponse` Pydantic models
+- [x] Get authenticated user from session via `get_current_user` dependency
+- [x] Get RLS-enforced agent_client via `get_agent_client(user_id)`
+- [x] Create orchestrator agent with agent_client
+- [x] Use `Runner.run_sync()` to execute agent with user query
+- [x] Implement basic session management (in-memory SQLiteSession store)
+- [x] Return agent response with session_id
+- [ ] Implement rate limiting (20 agent requests per minute per user)
+- [ ] Add request ID tracking through entire agent pipeline
+- [ ] Enhance error handling to return safe messages
+- [ ] Add comprehensive endpoint documentation with examples
+- [ ] Write endpoint tests: tool execution, handoffs, errors
+
+**Status**: Core endpoint functional with basic session support. Rate limiting and comprehensive error handling pending.
+
 ---
 
-**PAUSE**
+**Phase 4 Validation**
+
+- [x] Functional create_tag tool implemented with RLS enforcement
+- [x] Tag validation (alphanumeric, hyphens, underscores, max 50 chars)
+- [x] Database operations via agent_client (tags table insert)
+- [x] Comprehensive error handling in create_tag
+- [x] Agent system prompts defined (Orchestrator, Ideas, Tags)
+- [x] Ideas specialist agent created with SDK primitives
+- [x] Tags specialist agent created with create_tag tool
+- [x] Orchestrator agent with handoffs to both specialists
+- [x] Agent endpoint `/api/v1/agent/chat` functional
+- [x] Session management (basic SQLiteSession implementation)
+- [x] Runner.run_sync integration working
+- [x] Authentication flow (get_current_user → get_agent_client)
+- [x] Server starts without errors
+- [ ] Test create_tag with valid parameters via agent_client
+- [ ] Verify tag created in Supabase database with correct RLS enforcement
+- [ ] Test error handling: duplicate tags, invalid idea_id, RLS violations
+- [ ] Verify orchestrator prompt produces correct routing decisions
+- [ ] Run full integration test: user query → orchestrator → specialist → tool → database
+- [ ] Test agent endpoint end-to-end with authenticated user
+- [ ] Additional tool implementations (create_idea, search_ideas, etc.)
+- [ ] Rate limiting implementation
+- [ ] Comprehensive error handling and logging
+
+**Next Steps:**
+
+1. Test agent endpoint manually: Send authenticated request to `/api/v1/agent/chat`
+2. Verify orchestrator routes "create tag X" → Tags Agent → create_tag tool
+3. Verify tag appears in database with correct user_id (RLS)
+4. Implement additional tools (create_idea, etc.)
+5. Add rate limiting
+6. Write automated tests
 
 ---
 
-## Phase 5: Agent SDK & Specialist Implementation (Units 19-22)
+**PAUSE - Phase 4 Review**
 
-### AI PROMPT: Phase 5 Implementation (Units 19-22)
+Before proceeding to Phase 5, confirm:
+
+1. Server starts successfully
+2. Manual test of agent endpoint works
+3. Tag creation via agent verified in database
+
+---
+
+## Phase 5: Additional Tools & Testing (Adapted from Original Units 19-22)
+
+### AI PROMPT: Phase 5 Implementation (Additional Tools & Testing)
 
 ```
-Help me implement Phase 5 - Agent SDK & Specialist Implementation (Units 19-22):
+Help me implement Phase 5 - Additional Tools & Testing:
 
-**Unit 19 - Items Specialist Agent**
-1. Create backend/app/agents/items_specialist.py module
-2. Define ItemsSpecialistAgent class initialized with OpenAI client and system prompt from Unit 18
-3. Register available tools: create_item, update_item (placeholder for future), search_items (placeholder)
-4. Implement process_request(user_message, context, agent_client) method calling OpenAI Chat Completions API
-5. Configure OpenAI request for structured output (JSON mode) matching AgentResponse schema from Unit 17
-6. Implement response parsing and validation using Pydantic models
-7. Implement confidence-based decision logic: execute if confidence >= 0.8, clarify if < 0.8
-8. Implement execute_tool_call(action, payload, agent_client) method routing to appropriate tool
-9. Add conversation history management (last N messages for context)
-10. Implement token limit trimming to stay within model context window
-11. Add comprehensive logging for all agent decisions, tool calls, confidence scores
-12. Write agent tests: tool execution, clarification requests, refusals, confidence scoring
+**CONTEXT**: Phase 4 completed core agent infrastructure using OpenAI Agent SDK primitives.
+- Ideas Agent, Tags Agent, and Orchestrator implemented
+- create_tag tool functional with RLS enforcement
+- /api/v1/agent/chat endpoint working with Runner.run_sync
+- Basic session management in place
 
-**Unit 20 - Tags Specialist Agent**
-13. Create backend/app/agents/tags_specialist.py module
-14. Define TagsSpecialistAgent class following Items Specialist pattern
-15. Register create_tag tool from Unit 16
-16. Register search_tags tool (implement basic tag search functionality)
-17. Register delete_tag tool (implement with confirmation requirement)
-18. Implement process_request() method with Tags Specialist system prompt from Unit 18
-19. Implement deletion confirmation logic (refuse deleting tags without explicit user confirmation)
-20. Add tag suggestion capability (analyze item content and suggest relevant tags)
-21. Implement all standard agent methods following established pattern from Unit 19
-22. Add comprehensive logging specific to tag operations
-23. Write tests: tag creation, tag search, tag deletion with confirmation, tag suggestions
+**Unit 23 - create_idea Tool Implementation**
+1. Create backend/app/services/tools/create_idea.py module
+2. Implement create_idea(agent_client, title, description=None, status="draft") function
+3. Validate title (required, non-empty string)
+4. Validate status (must be: draft, active, or archived)
+5. Create idea using agent_client.from_("ideas").insert()
+6. Return dict with success status and created idea data
+7. Handle errors: empty title, invalid status, RLS violations
+8. Add comprehensive logging
+9. Write tests: valid creation, invalid inputs, RLS enforcement
 
-**Unit 21 - Orchestrator Agent Implementation**
-24. Create backend/app/agents/orchestrator.py module
-25. Define OrchestratorAgent class managing specialist routing
-26. Initialize with references to Items and Tags Specialists
-27. Implement route_request(user_message, context) method analyzing request and selecting specialist
-28. Implement routing logic: item operations → Items Specialist, tag operations → Tags Specialist
-29. Handle general questions by answering directly without specialist routing
-30. Implement ambiguous request handling asking user to clarify intent
-31. Add conversation memory tracking which specialist handled each turn
-32. Implement specialist response forwarding to user
-33. Add logging for routing decisions with rationale
-34. Implement fallback to direct answer when no specialist needed
-35. Write tests: routing decisions, specialist delegation, fallback handling
+**Unit 24 - Integrate create_idea with Ideas Agent**
+10. Update backend/app/services/app_agents/ideas_agent.py
+11. Import create_idea tool
+12. Create tool wrapper function binding agent_client
+13. Register tool with Ideas Agent
+14. Test: "Create an idea called 'Test Idea'" → verify idea created in database
 
-**Unit 22 - Agent SDK Backend Endpoint**
-36. Create POST /api/v1/agent/chat endpoint in backend/app/api/routes/agent.py
-37. Implement request handling accepting user message and optional conversation history
-38. Get authenticated user from session
-39. Get agent client for RLS-enforced operations
-40. Call orchestrator to process request and route to specialists
-41. If agent decides to execute tool, call tool execution handler
-42. Return agent response including action, rationale, tool results if applicable
-43. Implement rate limiting (20 agent requests per minute per user)
-44. Add request ID tracking through entire agent pipeline
-45. Implement error handling returning safe messages (never expose tool internals)
-46. Add endpoint documentation with request/response examples
-47. Write endpoint tests: tool execution, clarification, refusal, errors
+**Unit 25 - Additional Tag Tools**
+15. Implement search_tags(agent_client, query=None) in backend/app/services/tools/search_tags.py
+16. Implement link_tag(agent_client, tag_id, idea_id) in backend/app/services/tools/link_tag.py
+17. Register both tools with Tags Agent
+18. Write tests for each tool
+
+**Unit 26 - Agent Endpoint Testing**
+19. Test orchestrator routing: "Create a tag called python" → Tags Agent
+20. Test orchestrator routing: "Create idea AI Project" → Ideas Agent
+21. Test compound request: "Create idea X and tag it Y"
+22. Verify RLS enforcement: tags/ideas created with correct user_id
+23. Test error scenarios: invalid inputs, database errors
+24. Add request ID logging throughout pipeline
+25. Write automated endpoint tests
+
+**Unit 27 - Rate Limiting**
+26. Install slowapi library: pip install slowapi
+27. Create rate limiter instance in backend/app/core/rate_limiting.py
+28. Apply rate limiter to /api/v1/agent/chat: 20 requests/minute per user
+29. Test: send 21 requests rapidly, verify 429 on 21st
+30. Write rate limiting tests
 
 **Phase 5 Validation**
-48. Test Items Specialist directly with request: "Create an item called Test Item"
-49. Verify agent returns appropriate action with tool call
-50. Test Tags Specialist directly with request: "Add tag python to item"
-51. Test orchestrator routing with request: "Create a tag called python for my latest item"
-52. Verify response includes action, payload, rationale, tool execution result
-53. Verify tag created in database
-54. Test clarification scenario with ambiguous message: "Do something with my stuff"
-55. Test refusal scenario with unsafe operation: "Delete everything"
-56. Test RLS enforcement: verify agent only operates on authenticated user's data
-57. Test rate limiting: send 21 requests rapidly, verify 21st request rate-limited
-58. Check logs: routing decisions, tool executions, confidence scores all logged
+- Test Ideas Agent: "Create an idea called 'Agent Testing'"
+- Test Tags Agent: "Create a tag called python-agent"
+- Test Orchestrator routing with both idea and tag requests
+- Verify all database operations have correct RLS user_id
+- Verify rate limiting prevents abuse
+- Check logs for complete request tracing
 
 After implementation:
 - Show me files for review
-- Guide me through testing
+- Guide me through manual testing
 - Ask me to confirm tests pass
 
 Mark completed tasks with [x]. Wait for approval before proceeding to Phase 6.
@@ -775,7 +1224,6 @@ Mark completed tasks with [x]. Session 4 complete after approval!
 
 ---
 
-
 ## AI PROMPT: Final Validation - Complete Session 4
 
 ```
@@ -850,6 +1298,5 @@ SESSION 4 COMPLETE! 🎉
 PAUSE
 
 ---
-
 
 **END OF BEAST MODE PRD - SESSION 4 PART B**
