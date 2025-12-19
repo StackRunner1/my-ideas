@@ -45,13 +45,13 @@ This PRD documents the complete AI agent architecture including:
 
 ### Backend Setup
 
-- [ ] Python 3.12+ installed
-- [ ] Conda (or venv) environment active: from backend/ in terminal run `conda activate ideas` (or [command to activate venv])
-- [ ] Backend .env file with existing Supabase credentials from Session 2
-- [ ] OpenAI API key obtained from platform.openai.com
-- [ ] Add to backend/.env:
-      `OPENAI_API_KEY=sk-proj-... OPENAI_MODEL=gpt-5.1-mini OPENAI_MAX_TOKENS=4096`
-- [ ] Install base AI dependencies: `pip install openai pydantic cryptography`
+- [x] Python 3.12+ installed
+- [x] Conda (or venv) environment active: from backend/ in terminal run `conda activate ideas` (or [command to activate venv])
+- [x] Backend .env file with existing Supabase credentials from Session 2
+- [x] OpenAI API key obtained from platform.openai.com
+- [x] Add to backend/.env:
+      `OPENAI_API_KEY=sk-proj-... OPENAI_MODEL=gpt-4o-mini OPENAI_MAX_TOKENS=4096 ENCRYPTION_KEY=...`
+- [x] Install base AI dependencies: `pip install openai tiktoken cryptography`
 
 ### Frontend Setup
 
@@ -62,10 +62,11 @@ This PRD documents the complete AI agent architecture including:
 
 ### Supabase & Auth Setup
 
-- [ ] Session 2 auth complete (user authentication working)
-- [ ] Supabase project accessible
-- [ ] Test user account exists for testing
-- [ ] Verify existing RLS policies on items/tags tables
+- [x] Session 2 auth complete (user authentication working)
+- [x] Supabase project accessible
+- [x] Test user account exists for testing
+- [x] Verify existing RLS policies on items/tags tables
+- [x] Agent-user migration applied (20241219000001_add_agent_user_columns.sql)
 
 ### Development Workflow
 
@@ -788,6 +789,34 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ### Unit 11: ChatInterface Component
 
+**IMPORTANT - Install Missing shadcn/ui Components:**
+
+Before creating the ChatInterface component, you must manually install the required shadcn/ui components using the official CLI. The AI assistant should guide the learner to run these commands in the `frontend/` directory:
+
+```bash
+cd frontend
+npx shadcn@latest add table alert scroll-area textarea sheet drawer
+```
+
+**Why manual installation?**
+
+- shadcn/ui components should always be installed via the official CLI, not created manually
+- The CLI ensures correct dependencies, proper configuration, and up-to-date component code
+- Manual component creation risks version mismatches and missing Radix UI dependencies
+
+**After running the CLI command:**
+
+- [ ] Verify `src/components/ui/table.tsx` was created
+- [ ] Verify `src/components/ui/alert.tsx` was created
+- [ ] Verify `src/components/ui/scroll-area.tsx` was created
+- [ ] Verify `src/components/ui/textarea.tsx` was created
+- [ ] Verify `src/components/ui/sheet.tsx` was created
+- [ ] Verify `src/components/ui/drawer.tsx` was created
+- [ ] Check `package.json` for new `@radix-ui/react-scroll-area` dependency
+- [ ] Run `npm install` to install any new dependencies
+
+**Component Implementation Tasks:**
+
 - [ ] Create `frontend/src/components/chat/ChatInterface.tsx` component
 - [ ] Implement layout with message list area and input area using shadcn Card and ScrollArea
 - [ ] Create `useChat()` custom hook wrapping Redux actions and selectors
@@ -819,19 +848,49 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 - [ ] Make components accessible (ARIA labels, keyboard navigation)
 - [ ] Write component tests
 
-### Unit 13: Chat Route & Navigation Integration
+### Unit 13: Floating Chat Button & Drawer Integration
 
-- [ ] Add `/chat` path to `frontend/src/config/paths.ts`
-- [ ] Create `frontend/src/pages/Chat.tsx` page component
-- [ ] Wrap ChatInterface in page layout with header showing "AI Assistant" title
-- [ ] Add ProtectedRoute wrapper requiring authentication
-- [ ] Update `frontend/src/routes/AppRoutes.tsx` adding chat route
-- [ ] Update `frontend/src/components/Navigation.tsx` adding "Chat" link in authenticated nav
-- [ ] Add icon for chat link (use lucide-react MessageSquare or similar)
-- [ ] Implement page title and meta tags for SEO
-- [ ] Add breadcrumb navigation if applicable
-- [ ] Test route protection (redirect to login if not authenticated)
-- [ ] Write routing tests
+**IMPORTANT - Install Missing shadcn/ui Components:**
+
+Before creating the chat drawer, install the required shadcn/ui drawer/sheet component:
+
+```bash
+cd frontend
+npx shadcn@latest add sheet
+```
+
+**Chat UX Pattern:**
+
+- **NO dedicated /chat page** - users should not navigate away from their current context
+- **Floating button** - persistent in bottom right corner on all authenticated pages
+- **Sheet/Drawer** - chat opens in right-side drawer with full viewport height when button clicked
+- **Global access** - chat available from any authenticated page without navigation
+
+**Component Implementation Tasks:**
+
+- [ ] Create `frontend/src/components/chat/FloatingChatButton.tsx` component
+  - [ ] Implement floating button fixed to bottom-right corner (e.g., `fixed bottom-4 right-4 z-50`)
+  - [ ] Use MessageSquare icon from lucide-react with badge showing unread count (future)
+  - [ ] Add hover animation and accessible button label
+  - [ ] Implement onClick handler to open chat drawer
+  - [ ] Make button responsive (hide on very small screens if needed)
+- [ ] Create `frontend/src/components/chat/ChatDrawer.tsx` component wrapping ChatInterface
+  - [ ] Use shadcn Sheet component with side="right" for right-side drawer
+  - [ ] Set drawer width to appropriate size (e.g., `w-full md:w-[500px] lg:w-[600px]`)
+  - [ ] Drawer should span full viewport height
+  - [ ] Include Sheet header with "AI Assistant" title and close button
+  - [ ] Include token/cost display in drawer header
+  - [ ] Wrap ChatInterface component in Sheet content area
+  - [ ] Manage drawer open/closed state with React state
+- [ ] Integrate FloatingChatButton into `frontend/src/layouts/UserLayout.tsx`
+  - [ ] Render FloatingChatButton as persistent element in authenticated layout
+  - [ ] Ensure button appears on all authenticated pages (Dashboard, Ideas, Profile, Analytics)
+  - [ ] Pass drawer open/close handlers to FloatingChatButton
+- [ ] **Remove chat from navigation** - delete Chat link from Navigation.tsx
+- [ ] **Remove dedicated chat route** - delete /chat route from AppRoutes.tsx and Chat.tsx page file
+- [ ] Test drawer functionality: open, close, chat while on different pages
+- [ ] Test responsiveness: drawer should be full-width on mobile, partial-width on desktop
+- [ ] Write component tests for drawer interactions
 
 ### Unit 14: Responses API Polish & Testing
 
