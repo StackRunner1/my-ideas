@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     # Environment
     env: str = Field(default="local", env="ENV")
 
+    # OpenAI Configuration
+    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+    openai_max_tokens: int = Field(default=4096, env="OPENAI_MAX_TOKENS")
+    openai_temperature: float = Field(default=0.7, env="OPENAI_TEMPERATURE")
+    openai_timeout_seconds: int = Field(default=30, env="OPENAI_TIMEOUT_SECONDS")
+
+    # Encryption Configuration (optional - will be required when using agent features)
+    encryption_key: str = Field(default="", env="ENCRYPTION_KEY")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

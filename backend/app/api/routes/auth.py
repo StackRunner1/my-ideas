@@ -128,6 +128,7 @@ async def signup(credentials: SignupRequest, response: Response):
         agent_password = generate_secure_password()
 
         # Step 3: Create agent-user auth account
+        agent_user_id = None
         try:
             agent_signup_response = admin_client.auth.sign_up(
                 {"email": agent_email, "password": agent_password}
@@ -136,12 +137,20 @@ async def signup(credentials: SignupRequest, response: Response):
             if not agent_signup_response or not agent_signup_response.user:
                 # Log warning but don't fail user signup
                 print(f"WARNING: Failed to create agent-user for user {user_id}")
+            else:
+                agent_user_id = agent_signup_response.user.id
+                print(f"[DEBUG] Agent user created: {agent_user_id}")
         except Exception as agent_error:
             # Log error but don't fail user signup
             print(f"ERROR creating agent-user: {str(agent_error)}")
 
-        # Step 4: Store agent credentials securely
-        store_agent_credentials(user_id, agent_email, agent_password)
+        # Step 4: Store agent credentials securely (only if agent was created)
+        if agent_user_id:
+            try:
+                store_agent_credentials(user_id, agent_user_id, agent_password)
+                print(f"[DEBUG] Agent credentials stored for user {user_id}")
+            except Exception as store_error:
+                print(f"ERROR storing agent credentials: {str(store_error)}")
 
         # Step 5: Calculate expiresAt timestamp
         expires_at = int((time.time() + expires_in) * 1000)  # Convert to epoch ms

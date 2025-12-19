@@ -446,75 +446,76 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ### Unit 1: OpenAI SDK Setup
 
-- [ ] Install `openai` Python package and add to requirements.txt
-- [ ] Extend `backend/app/core/config.py` with OpenAI settings: API key, model name, max tokens, temperature, timeout
-- [ ] Create `backend/app/services/openai_service.py` module
-  - [ ] Implement `get_openai_client()` function returning configured OpenAI client with timeout and retry settings
-  - [ ] Implement `estimate_tokens(text: str)` utility using tiktoken for accurate token counting
-  - [ ] Implement `calculate_cost(prompt_tokens, completion_tokens, model)` utility with current GPT-4 pricing rates
-  - [ ] Add error handling for OpenAI API failures including rate limits and timeouts
-  - [ ] Add logging for all OpenAI API calls capturing model, tokens, cost, and latency metrics
-- [ ] Create health check endpoint `GET /api/v1/ai/health` testing OpenAI connectivity and model availability
+- [x] Install `openai` Python package and add to requirements.txt
+- [x] Extend `backend/app/core/config.py` with OpenAI settings: API key, model name, max tokens, temperature, timeout
+- [x] Create `backend/app/services/openai_service.py` module
+  - [x] Implement `get_openai_client()` function returning configured OpenAI client with timeout and retry settings
+  - [x] Implement `estimate_tokens(text: str)` utility using tiktoken for accurate token counting
+  - [x] Implement `calculate_cost(prompt_tokens, completion_tokens, model)` utility with current GPT-4 pricing rates
+  - [x] Add error handling for OpenAI API failures including rate limits and timeouts
+  - [x] Add logging for all OpenAI API calls capturing model, tokens, cost, and latency metrics
+- [x] Create health check endpoint `GET /api/v1/ai/health` testing OpenAI connectivity and model availability
 
 ### Unit 2: Agent-User Database Schema
 
-- [ ] Create Supabase migration file with timestamp naming convention
-- [ ] Add columns to `user_profile`: agent_user_id (UUID FK), agent_credentials_encrypted (TEXT), agent_created_at (TIMESTAMP), agent_last_used_at (TIMESTAMP)
-  - [ ] Add index on `agent_user_id` for performant lookups
-  - [ ] Add NOT NULL constraint on `agent_user_id` ensuring every user has agent-user
-  - [ ] Add CHECK constraint validating encrypted credentials have minimum length
-- [ ] Update RLS policies to allow users reading their agent metadata but not decrypting credentials
-- [ ] Create RLS policy restricting credential writes to service role only
-- [ ] Write migration rollback script for safe reversal
-- [ ] Document schema changes in project database documentation
-- [ ] Update TypeScript types excluding sensitive fields from frontend exposure
+- [x] Create Supabase migration file with timestamp naming convention
+- [x] Add columns to `user_profile`: agent_user_id (UUID FK), agent_credentials_encrypted (TEXT), agent_created_at (TIMESTAMP), agent_last_used_at (TIMESTAMP)
+  - [x] Add index on `agent_user_id` for performant lookups
+  - [x] Add NOT NULL constraint on `agent_user_id` ensuring every user has agent-user
+  - [x] Add CHECK constraint validating encrypted credentials have minimum length
+- [x] Update RLS policies to allow users reading their agent metadata but not decrypting credentials
+- [x] Create RLS policy restricting credential writes to service role only
+- [x] Write migration rollback script for safe reversal
+- [x] Document schema changes in project database documentation
+- [x] Update TypeScript types excluding sensitive fields from frontend exposure
 
 ### Unit 3: Credential Encryption Service
 
-- [ ] Install cryptography package and add to requirements.txt
-- [ ] Extend `backend/app/core/config.py` with ENCRYPTION_KEY setting from environment (base64-encoded Fernet key)
-- [ ] Create script to generate secure encryption key in `scripts/generate_encryption_key.py`
-- [ ] Create `backend/app/core/encryption.py` module
-  - [ ] Implement `get_fernet()` function returning cached Fernet cipher instance
-  - [ ] Implement `encrypt_password(password: str)` function returning base64-encoded ciphertext
-  - [ ] Implement `decrypt_password(encrypted: str)` function returning plaintext password
-  - [ ] Implement `rotate_encryption(old_key, new_key)` function for future key rotation scenarios
-  - [ ] Add comprehensive error handling for invalid ciphertexts and key errors
-  - [ ] Implement logging that never exposes plaintext passwords or encryption keys
-- [ ] Write unit tests for encrypt/decrypt round-trips and error scenarios
-- [ ] **Security Checklist:**
-  - [ ] Encryption key stored only in environment variable
-  - [ ] Encryption key never logged or exposed in error messages
-  - [ ] Plaintext passwords never logged anywhere
-  - [ ] Fernet provides authenticated encryption preventing tampering
+- [x] Install cryptography package and add to requirements.txt
+- [x] Extend `backend/app/core/config.py` with ENCRYPTION_KEY setting from environment (base64-encoded Fernet key)
+- [x] Create script to generate secure encryption key in `scripts/generate_encryption_key.py`
+- [x] Prompt user to run `python scripts/generate_encryption_key.py` and add output to `backend/.env`
+- [x] Create `backend/app/core/encryption.py` module
+  - [x] Implement `get_fernet()` function returning cached Fernet cipher instance
+  - [x] Implement `encrypt_password(password: str)` function returning base64-encoded ciphertext
+  - [x] Implement `decrypt_password(encrypted: str)` function returning plaintext password
+  - [x] Implement `rotate_encryption(old_key, new_key)` function for future key rotation scenarios
+  - [x] Add comprehensive error handling for invalid ciphertexts and key errors
+  - [x] Implement logging that never exposes plaintext passwords or encryption keys
+- [x] Write unit tests for encrypt/decrypt round-trips and error scenarios
+- [x] **Security Checklist:**
+  - [x] Encryption key stored only in environment variable
+  - [x] Encryption key never logged or exposed in error messages
+  - [x] Plaintext passwords never logged anywhere
+  - [x] Fernet provides authenticated encryption preventing tampering
 
 ### Unit 4: Agent-User Creation on Signup
 
-- [ ] Extend `backend/app/api/routes/auth.py` signup endpoint with agent creation logic
-  - [ ] After human user creation, generate agent email using pattern `agent_{user_id}@code45.internal`
-  - [ ] Generate cryptographically secure random password for agent (32+ characters)
-  - [ ] Use Supabase admin client to create agent auth account via `auth.sign_up()`
-  - [ ] Encrypt agent password using encryption service from Unit 3
-  - [ ] Store encrypted credentials in `user_profile` table using admin client to bypass RLS
-  - [ ] Implement transaction wrapper ensuring atomicity (rollback human user if agent creation fails)
-  - [ ] Add comprehensive audit logging for successful and failed agent creations
-- [ ] Update signup response model to include `agentCreated: boolean` field
-- [ ] Add error handling with safe messages that never expose credentials
-- [ ] Write integration test verifying two auth.users created and credentials stored encrypted
+- [x] Extend `backend/app/api/routes/auth.py` signup endpoint with agent creation logic
+  - [x] After human user creation, generate agent email using pattern `agent_{user_id}@code45.internal`
+  - [x] Generate cryptographically secure random password for agent (32+ characters)
+  - [x] Use Supabase admin client to create agent auth account via `auth.sign_up()`
+  - [x] Encrypt agent password using encryption service from Unit 3
+  - [x] Store encrypted credentials in `user_profile` table using admin client to bypass RLS
+  - [x] Implement transaction wrapper ensuring atomicity (rollback human user if agent creation fails)
+  - [x] Add comprehensive audit logging for successful and failed agent creations
+- [x] Update signup response model to include `agentCreated: boolean` field
+- [x] Add error handling with safe messages that never expose credentials
+- [x] Write integration test verifying two auth.users created and credentials stored encrypted
 
 ### Unit 5: Agent Authentication Service
 
-- [ ] Create `backend/app/services/agent_auth.py` module
-  - [ ] Implement `authenticate_agent_user(user_id: str)` function that retrieves and decrypts agent credentials then authenticates via Supabase
-  - [ ] Implement session caching using in-memory dictionary with expiry tracking
-  - [ ] Implement `get_agent_client(user_id: str)` function returning RLS-enforced Supabase client with agent token
-  - [ ] Attach `user_id` and `agent_user_id` attributes to client for audit logging
-  - [ ] Implement automatic token refresh when cached session expires
-  - [ ] Implement `revoke_agent_session(user_id)` function for logout scenarios
-  - [ ] Update `agent_last_used_at` timestamp in user_profile on each authentication
-  - [ ] Add comprehensive logging including authentication attempts, successes, failures with request IDs
-  - [ ] Add error handling for missing credentials, decryption failures, auth failures
-- [ ] Write integration tests verifying agent authentication and RLS enforcement
+- [x] Create `backend/app/services/agent_auth.py` module
+  - [x] Implement `authenticate_agent_user(user_id: str)` function that retrieves and decrypts agent credentials then authenticates via Supabase
+  - [x] Implement session caching using in-memory dictionary with expiry tracking
+  - [x] Implement `get_agent_client(user_id: str)` function returning RLS-enforced Supabase client with agent token
+  - [x] Attach `user_id` and `agent_user_id` attributes to client for audit logging
+  - [x] Implement automatic token refresh when cached session expires
+  - [x] Implement `revoke_agent_session(user_id)` function for logout scenarios
+  - [x] Update `agent_last_used_at` timestamp in user_profile on each authentication
+  - [x] Add comprehensive logging including authentication attempts, successes, failures with request IDs
+  - [x] Add error handling for missing credentials, decryption failures, auth failures
+- [x] Write integration tests verifying agent authentication and RLS enforcement
 
 ---
 
@@ -606,44 +607,44 @@ Mark completed tasks with [x] in Beast_Mode_Agent_SDK_PRD.md. Wait for approval 
 
 ### Unit 6: Pydantic Models for Responses API
 
-- [ ] Create `backend/app/models/responses_api.py` module
-- [ ] Define `QueryType` enum with values: sql_generation, data_analysis, summarization
-- [ ] Define `ResponsesAPIOutput` Pydantic model with fields: query_type, generated_sql, explanation, safety_check, confidence
-  - [ ] Add field validators ensuring generated_sql required when query_type is sql_generation
-  - [ ] Add validator for safety_check ensuring dangerous SQL patterns rejected
-  - [ ] Implement `validate_sql_safety()` method checking for DROP, DELETE without WHERE, ALTER, CREATE statements
-- [ ] Define `SQLQueryRequest` model for user queries with natural language question and optional schema context
-- [ ] Define `QueryResult` model for response including results, explanation, token usage, cost
-- [ ] Add JSON schema export for OpenAI structured outputs configuration
-- [ ] Write unit tests for all validation rules and safety checks
+- [x] Create `backend/app/models/responses_api.py` module
+- [x] Define `QueryType` enum with values: sql_generation, data_analysis, summarization
+- [x] Define `ResponsesAPIOutput` Pydantic model with fields: query_type, generated_sql, explanation, safety_check, confidence
+  - [x] Add field validators ensuring generated_sql required when query_type is sql_generation
+  - [x] Add validator for safety_check ensuring dangerous SQL patterns rejected
+  - [x] Implement `validate_sql_safety()` method checking for DROP, DELETE without WHERE, ALTER, CREATE statements
+- [x] Define `SQLQueryRequest` model for user queries with natural language question and optional schema context
+- [x] Define `QueryResult` model for response including results, explanation, token usage, cost
+- [x] Add JSON schema export for OpenAI structured outputs configuration
+- [x] Write unit tests for all validation rules and safety checks
 
 ### Unit 7: Responses API Service Implementation
 
-- [ ] Create `backend/app/services/responses_service.py` module
-- [ ] Implement `build_schema_context(agent_client)` function extracting relevant table schemas for prompt context
-- [ ] Implement `generate_sql_query(user_query: str, schema_context: dict)` function calling OpenAI Chat Completions with structured output
-  - [ ] Design system prompt for SQL generation emphasizing safety: SELECT only, require WHERE for deletions, add LIMIT if missing
-  - [ ] Configure OpenAI request to return JSON matching ResponsesAPIOutput schema
-- [ ] Implement `validate_and_sanitize_sql(sql: str)` function with comprehensive safety checks
-- [ ] Implement `execute_generated_query(agent_client, sql: str)` function running validated SQL via RLS-enforced client
-- [ ] Add result formatting converting database response to user-friendly format
-- [ ] Implement error handling for OpenAI API failures, unsafe SQL generation, query execution errors
-- [ ] Add logging for all API calls including tokens, cost, query types, safety violations
-- [ ] Write comprehensive tests for SQL generation, safety validation, execution with RLS
+- [x] Create `backend/app/services/responses_service.py` module
+- [x] Implement `build_schema_context(agent_client)` function extracting relevant table schemas for prompt context
+- [x] Implement `generate_sql_query(user_query: str, schema_context: dict)` function calling OpenAI Chat Completions with structured output
+  - [x] Design system prompt for SQL generation emphasizing safety: SELECT only, require WHERE for deletions, add LIMIT if missing
+  - [x] Configure OpenAI request to return JSON matching ResponsesAPIOutput schema
+- [x] Implement `validate_and_sanitize_sql(sql: str)` function with comprehensive safety checks
+- [x] Implement `execute_generated_query(agent_client, sql: str)` function running validated SQL via RLS-enforced client
+- [x] Add result formatting converting database response to user-friendly format
+- [x] Implement error handling for OpenAI API failures, unsafe SQL generation, query execution errors
+- [x] Add logging for all API calls including tokens, cost, query types, safety violations
+- [x] Write comprehensive tests for SQL generation, safety validation, execution with RLS
 
 ### Unit 8: Responses API Endpoint
 
-- [ ] Create `POST /api/v1/ai/query` endpoint in `backend/app/api/routes/ai.py`
-- [ ] Implement request handling extracting user query and optional schema hints from body
-- [ ] Get authenticated user from session (Session 2 auth dependency)
-- [ ] Get agent client using `get_agent_client(user_id)` for RLS-enforced database access
-- [ ] Call responses service to generate and execute SQL query
-- [ ] Return normalized response including results, explanation, tokens, cost
-- [ ] Implement rate limiting (10 queries per minute per user) using middleware or decorator
-- [ ] Add request ID tracking for full audit trail
-- [ ] Implement error responses with consistent format matching Session 3 patterns
-- [ ] Add endpoint documentation with OpenAPI schema
-- [ ] Write endpoint tests covering success cases, rate limiting, RLS enforcement, error scenarios
+- [x] Create `POST /api/v1/ai/query` endpoint in `backend/app/api/routes/ai.py`
+- [x] Implement request handling extracting user query and optional schema hints from body
+- [x] Get authenticated user from session (Session 2 auth dependency)
+- [x] Get agent client using `get_agent_client(user_id)` for RLS-enforced database access
+- [x] Call responses service to generate and execute SQL query
+- [x] Return normalized response including results, explanation, tokens, cost
+- [x] Implement rate limiting (10 queries per minute per user) using middleware or decorator
+- [x] Add request ID tracking for full audit trail
+- [x] Implement error responses with consistent format matching Session 3 patterns
+- [x] Add endpoint documentation with OpenAPI schema
+- [x] Write endpoint tests covering success cases, rate limiting, RLS enforcement, error scenarios
 
 ---
 
