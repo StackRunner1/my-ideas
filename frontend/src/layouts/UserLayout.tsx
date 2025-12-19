@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
+import { FloatingChatButton } from "@/components/chat/FloatingChatButton";
+import { ChatDrawer } from "@/components/chat/ChatDrawer";
 
 /**
  * UserLayout Component
@@ -8,11 +11,14 @@ import { Navigation } from "@/components/Navigation";
  * Features:
  * - Navigation bar with logo, nav links, and user menu
  * - Avatar dropdown with logout functionality
+ * - Floating chat button with drawer (accessible from all authenticated pages)
  * - Visual distinction from PublicLayout
  *
  * The <Outlet /> component renders the matched child route.
  */
 export function UserLayout() {
+  const [chatOpen, setChatOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header with Navigation */}
@@ -31,6 +37,10 @@ export function UserLayout() {
           © 2025 MyIdeas. All rights reserved.
         </div>
       </footer>
+
+      {/* Floating Chat Button & Drawer */}
+      <FloatingChatButton onClick={() => setChatOpen(true)} />
+      <ChatDrawer open={chatOpen} onOpenChange={setChatOpen} />
     </div>
   );
 }

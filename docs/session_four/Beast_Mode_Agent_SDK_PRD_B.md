@@ -67,36 +67,57 @@ Part B implements:
 | **Orchestration** | Single endpoint | Multi-specialist with routing |
 | **Use Cases** | "Show me X", "Analyze Y" | "Create item Z", "Tag A with B" |
 
-### Multi-Specialist Architecture
+### Multi-Specialist Agent Architecture
 
 ```
+                              ┌─────────────────┐
+                              │   Orchestrator  │
+                              │     Agent       │
+                              └────────┬────────┘
+                                       │
+                ┌──────────────────────┼──────────────────────┐
+                │                      │                      │
+                ▼                      ▼                      ▼
+        ┌───────────────┐      ┌──────────────┐     ┌──────────────┐
+        │ Items         │      │ Tags         │     │ Web Search   │
+        │ Specialist    │      │ Specialist   │     │ Tool         │
+        └───────┬───────┘      └──────┬───────┘     └──────┬───────┘
+                │                     │                    │
+                │                     │                    │
+        ┌───────▼───────┐     ┌───────▼──────┐     ┌───────▼──────┐
+        │ create_item   │     │ create_tag   │     │ search_web   │
+        │ update_item   │     │ search_tags  │     │ (built-in)   │
+        │ delete_item   │     │ delete_tag   │     └──────────────┘
+        └───────────────┘     └──────────────┘
+                │                     │
+                └──────────┬──────────┘
+                           │
+                           ▼
+                  ┌────────────────┐
+                  │    Supabase    │
+                  │    (via RLS)   │
+                  └────────────────┘
+```
+
+**Architecture Flow**:
+1. User sends message to Orchestrator Agent
+2. Orchestrator analyzes intent and routes to appropriate specialist
+3. Specialist Agent receives request and decides which tool to use
+4. Tool executes database operation via RLS-enforced agent client
+5. Results flow back: Tool → Specialist → Orchestrator → User
+
+**Example User Flow**:
+```
 User: "Create a new item called 'Learn Rust' and tag it with 'programming'"
-       │
-       ▼
-┌──────────────────┐
-│  Orchestrator    │  Analyzes intent → Routes to specialists
-│     Agent        │
-└────────┬─────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌─────────┐ ┌─────────┐
-│ Items   │ │  Tags   │
-│ Agent   │ │ Agent   │
-└────┬────┘ └────┬────┘
-     │           │
-     ▼           ▼
-create_item   create_tag
-  (tool)        (tool)
-     │           │
-     └─────┬─────┘
-           ▼
-    ┌──────────────┐
-    │   Supabase   │  RLS enforces user boundaries
-    │  (via agent  │
-    │   client)    │
-    └──────────────┘
+  │
+  ▼
+Orchestrator: Detects compound request (item creation + tagging)
+  │
+  ├──> Items Specialist: execute create_item("Learn Rust")
+  │         └──> Supabase INSERT (RLS enforced)
+  │
+  └──> Tags Specialist: execute create_tag("programming", item_id)
+            └──> Supabase INSERT (RLS enforced)
 ```
 
 ---
