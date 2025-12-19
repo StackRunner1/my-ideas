@@ -6,12 +6,14 @@ from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ...api.auth_utils import get_current_user
+from ...core.logging import get_logger
 from ...models.responses_api import QueryResult, SQLQueryRequest
 from ...services.agent_auth import get_agent_client
 from ...services.openai_service import (calculate_cost, estimate_tokens,
                                         test_openai_connection)
 from ...services.responses_service import process_query_request
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # Rate limiting: {user_id: [(timestamp, count)]}
@@ -116,11 +118,36 @@ async def query_database(
         # Get agent client for RLS-enforced database access
         agent_client = get_agent_client(user_id)
 
+        # Extract settings (use defaults if not provided)
+        settings = query_request.settings
+        temperature = settings.temperature if settings else 0.7
+        max_tokens = settings.max_tokens if settings else 2000
+
+        # Convert conversation_history to dict format
+        history = None
+        if query_request.conversation_history:
+            history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in query_request.conversation_history
+            ]
+            logger.info(f"[AI_ENDPOINT] 📜 Received {len(history)} conversation history messages")
+            for i, msg in enumerate(history):
+                preview = msg['content'][:100] + '...' if len(msg['content']) > 100 else msg['content']
+                logger.info(f"[AI_ENDPOINT]   Message {i+1}/{len(history)}: {msg['role']} - {preview}")
+        else:
+            logger.info("[AI_ENDPOINT] ⚠️ No conversation history provided")
+        
+        logger.info(f"[AI_ENDPOINT] 💬 Current query: {query_request.query}")
+        logger.info(f"[AI_ENDPOINT] ⚙️ Settings: temp={temperature}, max_tokens={max_tokens}")
+
         # Process query request
         result = process_query_request(
             agent_client=agent_client,
             user_query=query_request.query,
             schema_hints=query_request.schema_context,
+            conversation_history=history,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
         # Add token usage and cost if available

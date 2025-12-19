@@ -7,6 +7,16 @@
 import apiClient from "../lib/apiClient";
 
 // TypeScript interfaces matching backend models
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface QuerySettings {
+  temperature?: number; // 0.0-2.0
+  maxTokens?: number; // 100-8192
+}
+
 export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
@@ -15,6 +25,8 @@ export interface TokenUsage {
 
 export interface QueryRequest {
   query: string;
+  conversationHistory?: Message[];
+  settings?: QuerySettings;
   schemaContext?: Record<string, any>;
   includeExplanation?: boolean;
 }
@@ -33,15 +45,17 @@ export interface QueryResult {
 }
 
 /**
- * Send natural language query to AI backend.
+ * Send natural language query to AI backend with conversation context.
  *
  * @param query - Natural language question
- * @param options - Optional configuration
+ * @param options - Optional configuration including conversation history and settings
  * @returns Query result with generated SQL and execution data
  */
 export async function sendQuery(
   query: string,
   options?: {
+    conversationHistory?: Message[];
+    settings?: QuerySettings;
     schemaContext?: Record<string, any>;
     includeExplanation?: boolean;
   }
@@ -49,14 +63,44 @@ export async function sendQuery(
   try {
     const requestBody: QueryRequest = {
       query,
+      conversationHistory: options?.conversationHistory,
+      settings: options?.settings,
       schemaContext: options?.schemaContext,
       includeExplanation: options?.includeExplanation ?? true,
     };
+
+    console.log("🌐 [API] Sending POST to /api/v1/ai/query");
+    console.log(
+      "📦 [API] Request body:",
+      JSON.stringify(
+        {
+          query: requestBody.query,
+          conversationHistory: requestBody.conversationHistory?.length
+            ? `${requestBody.conversationHistory.length} messages`
+            : "none",
+          settings: requestBody.settings,
+          includeExplanation: requestBody.includeExplanation,
+        },
+        null,
+        2
+      )
+    );
+    if (
+      requestBody.conversationHistory &&
+      requestBody.conversationHistory.length > 0
+    ) {
+      console.log(
+        "📜 [API] Full conversation history:",
+        requestBody.conversationHistory
+      );
+    }
 
     const response = await apiClient.post<QueryResult>(
       "/api/v1/ai/query",
       requestBody
     );
+
+    console.log("✅ [API] Response received:", response.data);
 
     // Validate response
     if (!response || !response.data) {

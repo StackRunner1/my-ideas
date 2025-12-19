@@ -6,15 +6,23 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { HelpCircle } from "lucide-react";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { ScrollArea } from "../ui/scroll-area";
 import { Textarea } from "../ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 import { useChat } from "../../hooks/useChat";
 import { Message } from "../../store/chatSlice";
 import { MessageCard } from "./MessageCard";
 import { ClearChatDialog } from "./ClearChatDialog";
+import { ChatLoadingState } from "./LoadingSkeleton";
 import { toast } from "sonner";
 
 const EXAMPLE_QUERIES = [
@@ -86,6 +94,19 @@ export function ChatInterface() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Screen reader announcements */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {loading && "AI is processing your query"}
+        {!loading &&
+          messages.length > 0 &&
+          messages[messages.length - 1]?.content}
+      </div>
+
       {/* Messages Area */}
       <Card className="flex-1 overflow-hidden">
         <ScrollArea className="h-full p-4">
@@ -123,15 +144,8 @@ export function ChatInterface() {
                 <MessageCard key={message.id} message={message} />
               ))}
 
-              {/* Loading indicator */}
-              {loading && (
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <div className="h-2 w-2 animate-bounce rounded-full bg-primary" />
-                  <div className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
-                  <div className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
-                  <span>AI is thinking...</span>
-                </div>
-              )}
+              {/* Loading skeleton */}
+              {loading && <ChatLoadingState />}
 
               {/* Scroll anchor */}
               <div ref={scrollRef} />
@@ -142,24 +156,53 @@ export function ChatInterface() {
 
       {/* Error display */}
       {error && (
-        <Alert variant="destructive" className="mt-4">
+        <Alert role="alert" variant="destructive" className="mt-4">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Input Area */}
       <div className="mt-4 space-y-2">
-        <div className="flex gap-2">
+        <div className="relative">
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your ideas..."
-            className="min-h-[80px] resize-none"
+            className="min-h-[80px] resize-none pr-10"
             disabled={loading}
             aria-label="Query input"
           />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-2 h-6 w-6"
+                  type="button"
+                >
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <div className="space-y-2 text-xs">
+                  <p className="font-semibold">Tips for effective queries:</p>
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Be specific: "Show ideas from last week"</li>
+                    <li>Use natural language: "Which ideas have tags?"</li>
+                    <li>Reference columns: title, status, created_at</li>
+                    <li>Limit results: "Show my 10 most recent ideas"</li>
+                  </ul>
+                  <p className="text-muted-foreground">
+                    Part A supports read-only queries. Create/update/delete
+                    coming in Part B.
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div className="flex justify-between">

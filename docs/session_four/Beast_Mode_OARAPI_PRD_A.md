@@ -1,38 +1,46 @@
-# OpenAI Responses API & Agent SDK Implementation - Product Requirements Document v1.0
+# OpenAI Responses API Implementation - PART A - Product Requirements Document v1.0
 
 ## Overview
 
-Comprehensive documentation of the **OpenAI Responses API and Agent SDK integration** in the code45 platform, covering both standalone AI chat functionality and sophisticated agentic systems with tool execution, structured outputs, and multi-specialist orchestration.
+**THIS IS PART A**: Comprehensive documentation of the **OpenAI Responses API integration** for multi-turn chat experiences with natural language database queries.
 
-**Key Architecture**: This implementation provides TWO interaction patterns:
+**PART B SEPARATE**: Agent SDK implementation (multi-specialist agents, CRUD operations, web search) is documented in `Beast_Mode_Agent_SDK_PRD_B.md` and is **out of scope** for Part A.
 
-1. **Responses API** (non-agentic): Direct structured LLM completions for query generation and analysis
-2. **Agent SDK** (agentic): Autonomous agents with tool-calling capabilities, decision-making, and multi-specialist orchestration
+**What Part A Delivers**: Multi-turn conversational AI chat interface using OpenAI's Responses API for natural language to SQL query generation, with secure agent-user authentication and RLS enforcement.
 
-Both patterns leverage **agent-user authentication** (created during user signup) to enforce RLS boundaries and provide secure, user-scoped database access for AI operations.
+**Key Pattern**:
+
+- User asks question → LLM decides if database query needed → Calls query_database tool → Execute SQL via RLS-enforced agent client → LLM formats results → Natural language response
+
+**Foundation for Part B**: This implementation establishes:
+
+1. Agent-user authentication (encrypted credentials, service accounts)
+2. OpenAI SDK integration (client setup, token tracking, cost calculation)
+3. Chat interface foundation (Redux state, floating drawer UI, message components)
+4. RLS enforcement patterns (user-scoped database access via agent clients)
 
 ## Business Context
 
-- **Problem**: Modern applications need AI capabilities ranging from simple
-  structured queries to complex autonomous operations, with secure database
-  access and user-scoped permissions
-- **Solution**: Dual-mode AI integration using OpenAI's Responses API for
-  structured interactions and Agent SDK for autonomous tool execution, both
-  authenticated via agent-user service accounts with RLS enforcement
-- **Value**: Production-ready AI capabilities with multiple use cases, secure
-  permissions model, autonomous database operations, and foundation for
-  sophisticated multi-agent systems
+- **Problem**: Users need to query their data using natural language without learning SQL or navigating complex UIs
+- **Solution**: Multi-turn Responses API integration with function calling for database queries, authenticated via agent-user service accounts with RLS enforcement
+- **Value**: Intuitive data access via chat interface, secure user-scoped queries, foundation for advanced agentic capabilities (Part B)
 
-## Implementation Scope
+## Part A Implementation Scope
 
-This PRD documents the complete AI agent architecture including:
+This PRD (Part A) documents **Responses API implementation only**:
 
-1. **Backend AI Infrastructure**: OpenAI SDK setup, structured output validation, tool specification patterns
-2. **Agent-User Authentication**: Service account creation, credential encryption, agent-specific RLS enforcement
-3. **Responses API Integration**: Structured LLM completions for database queries and analysis
-4. **Agent SDK Integration**: Autonomous agents with tool-calling, decision boundaries, and orchestration
-5. **Frontend Chat Interface**: User-facing chat UI with message history, action indicators, and responsive design
-6. **Production Safeguards**: Rate limiting, timeouts, cost tracking, error handling, and observability
+1. **Backend AI Infrastructure**: OpenAI SDK setup, token estimation, cost tracking
+2. **Agent-User Authentication**: Service account creation, credential encryption, RLS-enforced clients
+3. **Responses API Integration**: Multi-turn function calling for database queries (SELECT only)
+4. **Frontend Chat Interface**: Floating drawer chat UI with message history, SQL display, results tables
+5. **Production Safeguards**: Rate limiting (10 queries/minute), error handling, request tracking
+
+**NOT in Part A** (see Part B PRD):
+
+- Agent SDK with multi-specialist orchestration
+- CRUD operations (CREATE, UPDATE, DELETE)
+- Web search tool integration
+- Autonomous agent decision-making
 
 ## AI Coding Agent (GitHub Copilot or similar) Instructions
 
@@ -105,7 +113,7 @@ Use for: Autonomous operations, multi-step workflows, tool execution with decisi
 │   (Human)   │         │   FastAPI    │         │   Service    │         │   Database   │
 └──────┬──────┘         └───────┬──────┘         └───────┬──────┘         └──────┬───────┘
        │                        │                        │                       │
-       │  1. Navigate to /chat  │                        │                       │
+       │  1. Open chat drawer   │                        │                       │
        │───────────────────────>│                        │                       │
        │                        │  2. Get agent creds    │                       │
        │                        │     from user_profile  │                       │
@@ -142,64 +150,68 @@ Use for: Autonomous operations, multi-step workflows, tool execution with decisi
        ▼                        ▼                        ▼                       ▼
 ```
 
-### Multi-Specialist Agent Architecture
+### Part A: Responses API Architecture (Current Implementation)
 
 ```
-                              ┌─────────────────┐
-                              │   Orchestrator  │
-                              │     Agent       │
-                              └────────┬────────┘
-                                       │
-                ┌──────────────────────┼──────────────────────┐
-                │                      │                      │
-                ▼                      ▼                      ▼
-        ┌───────────────┐      ┌──────────────┐     ┌──────────────┐
-        │ Items         │      │ Tags         │     │ Web Search   │
-        │ Specialist    │      │ Specialist   │     │ Tool         │
-        └───────┬───────┘      └──────┬───────┘     └──────┬───────┘
-                │                     │                    │
-                │                     │                    │
-        ┌───────▼───────┐     ┌───────▼──────┐     ┌───────▼──────┐
-        │ create_item   │     │ create_tag   │     │ search_web   │
-        │ update_item   │     │ search_tags  │     │ (built-in)   │
-        │ delete_item   │     │ delete_tag   │     └──────────────┘
-        └───────────────┘     └──────────────┘
-                │                     │
-                └──────────┬──────────┘
-                           │
-                           ▼
-                  ┌────────────────┐
-                  │    Supabase    │
-                  │    (via RLS)   │
-                  └────────────────┘
+┌──────────────┐         ┌─────────────────┐         ┌──────────────────┐
+│   User       │         │   OpenAI        │         │   Supabase       │
+│  (Frontend)  │         │  Responses API  │         │   Database       │
+└──────┬───────┘         └────────┬────────┘         └────────┬─────────┘
+       │                          │                           │
+       │  1. "Show me all ideas" │                           │
+       │─────────────────────────>│                           │
+       │                          │                           │
+       │  2. Turn 1: System      │                           │
+       │     instructions +       │                           │
+       │     tools available      │                           │
+       │<─────────────────────────│                           │
+       │                          │                           │
+       │  3. LLM decides to call  │                           │
+       │     query_database tool  │                           │
+       │<─────────────────────────│                           │
+       │                          │                           │
+       │  4. Execute SQL via      │                           │
+       │     agent client (RLS)   │                           │
+       │──────────────────────────────────────────────────────>│
+       │                          │                           │
+       │  5. Query results        │                           │
+       │<──────────────────────────────────────────────────────│
+       │                          │                           │
+       │  6. Turn 2: Send results │                           │
+       │     to LLM for formatting│                           │
+       │─────────────────────────>│                           │
+       │                          │                           │
+       │  7. Natural language     │                           │
+       │     response with data   │                           │
+       │<─────────────────────────│                           │
+       ▼                          ▼                           ▼
 ```
+
+**Note**: Multi-specialist Agent SDK architecture is implemented in **Part B** (separate PRD).
 
 ## Core Goals and Objectives
 
-### Goal 1: OpenAI Agent SDK Integration
+### PART A GOALS (This Document)
 
-**Install and integrate the OpenAI Agent SDK** with:
+### Goal 1: OpenAI Responses API Integration
 
-- **Orchestrator agent** (decides which specialist to call)
-- **2 specialist agents** (Items Agent, Tags Agent)
-- **Built-in tools** (e.g., web search for context)
-- **Custom Supabase tools** (CRUD on `items` table)
-- **Chat interface** (basic UI for user-agent interaction)
+**Implement the Responses API with multi-turn function calling** for:
 
-**Learning Focus**: Agent architecture, tool delegation, decision boundaries
+- **Multi-turn conversation flow** (Turn 1 → Tool call → Turn 2 with results)
+- **Function calling pattern** (LLM decides when to call query_database tool)
+- **Natural language to SQL** conversion with safety validation
+- **Floating drawer chat interface** (accessible from all authenticated pages)
+- **RLS-enforced database queries** via agent-user authentication
+
+**Learning Focus**: Responses API mechanics, multi-turn function calling, tool execution, structured outputs
 
 ---
 
-### Goal 2: OpenAI Responses API Integration
+### Goal 2: OpenAI Responses API Integration - MOVED TO PART B
 
-**Implement the Responses API** (separate from Agent SDK) for:
+**Agent SDK Integration** (Orchestrator + Specialists) is implemented in **Part B** (separate PRD).
 
-- **Structured LLM interactions** (not agentic, just completions)
-- **Reuse chat interface** and custom tools
-- **Database queries** via natural language
-- **Comparison point**: When to use Responses vs. Agents
-
-**Learning Focus**: API differences, use case selection, structured outputs
+**Part A Focus**: Single-purpose Responses API for database queries only.
 
 ---
 
@@ -221,12 +233,13 @@ Use for: Autonomous operations, multi-step workflows, tool execution with decisi
 
 **Authenticate agents using existing RLS**:
 
-- **Trigger on navigation to "/"** (or chat routes)
+- **Trigger on chat drawer interaction** (floating button click)
 - **Use stored credentials** to authenticate agent-user
-- **Leverage existing endpoints** via `user_scoped_client`
+- **Execute database queries** via RLS-enforced `agent_client`
 - **Agent operates under user's permissions** (RLS enforces boundaries)
+- **All tool calls** automatically scoped to authenticated user's data
 
-**Learning Focus**: RLS with service accounts, scoped auth, audit trails
+**Learning Focus**: RLS with service accounts, scoped auth, audit trails, secure tool execution
 
 ---
 
@@ -644,7 +657,11 @@ Mark completed tasks [x] in PRD. Await approval before Phase 3.
     - [x] `execute_query_database(agent_client, sql, explanation)` handler function (NOT a class method)
     - [x] SQL validation: Block DROP/ALTER/CREATE/UPDATE/DELETE, require SELECT, enforce LIMIT (default 50)
     - [x] SQL execution via PostgREST query builder: Parse table name, columns, ORDER BY, LIMIT
-    - [x] ORDER BY implementation: Use `query.order(column, desc=True)` for DESC, `query.order(column, desc=False)` for ASC
+    - [x] **CRITICAL - ORDER BY Syntax**: Use correct Supabase Python client syntax:
+      - [x] For DESC: `query.order(column, desc=True)` (NOT `query.order("column.desc")`)
+      - [x] For ASC: `query.order(column)` or `query.order(column, desc=False)`
+      - [x] Old PostgREST v1 syntax causes parsing errors: "failed to parse order (column.desc.asc)"
+      - [x] Add debug logging to show ORDER BY detection and application
     - [x] WHERE clause: Log if detected but do NOT apply (PostgREST filter conversion too complex)
     - [x] Return format: `{"success": bool, "results": list, "row_count": int}` or `{"success": False, "error": str}`
   - [x] `__init__.py`: Export ALL_TOOLS list (contains tool dicts) and TOOL_HANDLERS dict (maps tool names to handler functions)
@@ -653,8 +670,11 @@ Mark completed tasks [x] in PRD. Await approval before Phase 3.
 
   - [x] Import tools: `from ..tools import ALL_TOOLS, TOOL_HANDLERS`
   - [x] `build_schema_context()`: Returns string describing ideas table schema (columns, types, sample queries)
-  - [x] `process_query_request(agent_client, user_query)` multi-turn flow:
-    - [x] **Turn 1**: `client.responses.create(instructions=[...], input=[{"type": "message", "role": "user", "content": user_query}], tools=ALL_TOOLS, tool_choice="auto")`
+  - [x] `process_query_request(agent_client, user_query, conversation_history=None, temperature=0.7, max_tokens=2000)` multi-turn flow:
+    - [x] **Conversation History Support**: Accept `conversation_history` (list of {role, content} dicts) to provide context from previous messages
+    - [x] Build messages array: Include last 10 conversation history messages + current query for contextual awareness
+    - [x] **Settings Integration**: Accept `temperature` and `max_tokens` parameters to allow user-configurable AI behavior
+    - [x] **Turn 1**: `client.responses.create(instructions=[...], input=messages_array, tools=ALL_TOOLS, tool_choice="auto", temperature=temperature, max_output_tokens=max_tokens)`
     - [x] Parse `response.output` for function_call items - check BOTH top-level output items AND nested in message.content items
     - [x] **Critical**: ResponseFunctionToolCall attributes are `.name`, `.arguments`, `.call_id` directly (NOT `.function.name`)
     - [x] If no tool calls detected: Extract output_text from message items, return conversational response
@@ -677,12 +697,15 @@ Mark completed tasks [x] in PRD. Await approval before Phase 3.
 ### Unit 8: Responses API Endpoint
 
 - [x] Create `POST /api/v1/ai/query` endpoint in `backend/app/api/routes/ai.py`
+- [x] Import logger: `from ..core.logging import get_logger` and initialize: `logger = get_logger(__name__)`
 - [x] Request handling:
-  - [x] Extract `SQLQueryRequest` from request body
+  - [x] Extract `SQLQueryRequest` from request body (includes conversation_history, settings)
   - [x] Get authenticated user via Session 2 auth dependency
   - [x] Get agent client: `get_agent_client(user_id)` for RLS-enforced access
+  - [x] **Conversation History Logging**: Log received conversation history count and message previews for debugging
+  - [x] **Settings Extraction**: Extract temperature and max_tokens from request.settings (use defaults 0.7, 2000 if not provided)
 - [x] Process query:
-  - [x] Call `process_query_request(agent_client, user_query)`
+  - [x] Call `process_query_request(agent_client, user_query, conversation_history, temperature, max_tokens)`
   - [x] Return `QueryResult` with explanation, results, SQL, token usage, cost
 - [x] Rate limiting: 10 queries/minute per user (in-memory tracking)
 - [x] Request ID tracking via middleware for audit trail
@@ -772,29 +795,39 @@ Mark tasks [x] in PRD. Show key files (chatSlice.ts, chatService.ts, ChatInterfa
 ### Unit 9: Redux Chat Slice
 
 - [x] Create `frontend/src/store/chatSlice.ts` module
-- [x] Define `ChatState` interface with messages array, loading state, error, token usage
+- [x] Define `ChatState` interface with messages array, loading state, error, token usage, settings (temperature, maxTokens)
 - [x] Define `Message` type with id, role (user/assistant), content, timestamp, metadata (tokens, cost)
-- [x] Create slice with reducers: addMessage, setLoading, setError, clearMessages, updateTokenUsage
+- [x] Define `ChatSettings` type with temperature (0.0-2.0, default 0.7) and maxTokens (100-8192, default 2000)
+- [x] Create slice with reducers: addMessage, setLoading, setError, clearMessages, updateTokenUsage, updateSettings
 - [x] Create `sendQuery` async thunk calling `/api/v1/ai/query` endpoint
+  - [x] **Conversation History**: Extract last 10 messages from state and include as conversationHistory in API request
+  - [x] **Settings Integration**: Include current temperature and maxTokens settings in API request
+  - [x] **Client-side Logging**: Log conversation history count, current query, and settings to browser console for debugging
   - [x] Implement optimistic update adding user message immediately before API call
   - [x] Implement thunk fulfilled handler adding assistant response to messages
   - [x] Implement error handling storing error message in state
 - [x] Add selectors for messages, loading state, total tokens used, total cost
 - [x] Export actions and reducer
 - [x] Integrate chat reducer into root store configuration
-- [ ] Write tests for reducers and async thunk lifecycle
+- [x] Write tests for reducers and async thunk lifecycle
 
 ### Unit 10: Chat Service Layer
 
 - [x] Create `frontend/src/services/chatService.ts` module
-- [x] Define TypeScript interfaces matching backend models: QueryRequest, QueryResult
-- [x] Implement `sendQuery(query: string)` function calling POST `/api/v1/ai/query`
+- [x] Define TypeScript interfaces matching backend models:
+  - [x] `Message` interface: {role: "user" | "assistant", content: string}
+  - [x] `QuerySettings` interface: {temperature?: number, maxTokens?: number}
+  - [x] `QueryRequest`: {query, conversationHistory?, settings?, schemaContext?, includeExplanation?}
+  - [x] `QueryResult`: {success, queryType, generatedSql, explanation, results, rowCount, tokenUsage, cost, warnings, error}
+- [x] Implement `sendQuery(query: string, options?: {conversationHistory?, settings?})` function calling POST `/api/v1/ai/query`
+  - [x] **HTTP Request Logging**: Log full request body including conversation history and settings to browser console
+  - [x] Include conversationHistory and settings in request body
 - [x] Implement response parsing and validation
 - [x] Add error handling with user-friendly error messages
 - [x] Implement `getConversationHistory()` function (placeholder for future persistence)
 - [x] Add logging for debugging (client-side console logs in development only)
 - [x] Export all service functions
-- [ ] Write service layer tests mocking apiClient
+- [x] Write service layer tests mocking apiClient
 
 ### Unit 11: ChatInterface Component
 
@@ -804,7 +837,7 @@ Before creating the ChatInterface component, you must manually install the requi
 
 ```bash
 cd frontend
-npx shadcn@latest add table alert scroll-area textarea sheet drawer
+npx shadcn@latest add table alert scroll-area textarea sheet drawer slider tooltip
 ```
 
 **Why manual installation?**
@@ -821,8 +854,8 @@ npx shadcn@latest add table alert scroll-area textarea sheet drawer
 - [x] Verify `src/components/ui/textarea.tsx` was created
 - [x] Verify `src/components/ui/sheet.tsx` was created
 - [x] Verify `src/components/ui/drawer.tsx` was created
-- [x] Check `package.json` for new `@radix-ui/react-scroll-area` dependency
-- [x] Run `npm install` to install any new dependencies
+- [x] Verify `src/components/ui/slider.tsx` was created
+- [x] Verify `src/components/ui/tooltip.tsx` was created
 
 **Component Implementation Tasks:**
 
@@ -838,7 +871,7 @@ npx shadcn@latest add table alert scroll-area textarea sheet drawer
 - [x] Implement error display using shadcn Alert component
 - [x] Add keyboard shortcut (Cmd/Ctrl+Enter) to send message
 - [x] Make component responsive for mobile screens
-- [ ] Write component tests for user interactions
+  - [x] Write component tests for user interactions
 
 ### Unit 12: Message Display Components
 
@@ -855,18 +888,12 @@ npx shadcn@latest add table alert scroll-area textarea sheet drawer
   - [x] Add row limit with "show more" pagination if results exceed limit
   - [x] Style using shadcn Table component
 - [x] Make components accessible (ARIA labels, keyboard navigation)
-- [ ] Write component tests
+- [x] Write component tests
 
 ### Unit 13: Floating Chat Button & Drawer Integration
 
 **IMPORTANT - Install Missing shadcn/ui Components:**
-
-Before creating the chat drawer, install the required shadcn/ui drawer/sheet component:
-
-```bash
-cd frontend
-npx shadcn@latest add sheet
-```
+Before creating the chat drawer, ensure the required shadcn/ui drawer/sheet component(s) are present:
 
 **Chat UX Pattern:**
 
@@ -899,7 +926,7 @@ npx shadcn@latest add sheet
 - [x] **Remove dedicated chat route** - delete /chat route from AppRoutes.tsx and Chat.tsx page file
 - [x] Test drawer functionality: open, close, chat while on different pages
 - [x] Test responsiveness: drawer should be full-width on mobile, partial-width on desktop
-- [ ] Write component tests for drawer interactions
+- [x] Write component tests for drawer interactions
 
 ### Unit 14: Responses API Polish & Testing
 
@@ -907,22 +934,55 @@ npx shadcn@latest add sheet
 - [x] Implement confirmation dialog before clearing chat history
 - [x] Add example queries as clickable chips when chat is empty
 - [x] Implement token/cost display in chat header showing session totals
-- [ ] Add settings panel for adjusting query parameters (temperature, max tokens) - future enhancement hook
-- [ ] Implement loading skeleton states for better perceived performance
+- [x] Chat Settings Panel Implementation:
+  - [x] Create `ChatSettings.tsx` component with Sheet/Drawer UI
+  - [x] Add temperature slider (0.0-2.0, default 0.7) with live value display
+  - [x] Add maxTokens slider (100-8192, default 2000) with live value display
+  - [x] Connect sliders to Redux state via `updateSettings` action
+  - [x] Include helpful descriptions for each setting
+  - [x] Settings apply to all future queries immediately
+  - [x] Add settings button to chat header/toolbar
+- [x] Implement loading skeleton states for better perceived performance
 - [x] Add toast notifications for successful query execution and errors
-- [ ] Write E2E test scenarios: send query, receive response, verify SQL generation, verify results display
-- [ ] Write test for rate limiting behavior from user perspective
-- [ ] Write test for RLS enforcement (user should only see their data)
-- [ ] Create user documentation for chat feature
-- [ ] Add inline help tooltips explaining how to ask questions effectively
-- [ ] Performance test: measure and optimize for large result sets
-- [ ] Accessibility audit and fixes
+- [x] Write E2E test scenarios: send query, receive response, verify SQL generation, verify results display
+- [x] Write test for rate limiting behavior from user perspective
+- [x] Write test for RLS enforcement (user should only see their data)
+- [x] Create user documentation for chat feature
+- [x] Add inline help tooltips explaining how to ask questions effectively
+- [x] Performance test: measure and optimize for large result sets
+- [x] Accessibility audit and fixes
+
+**Table Stakes Features - Critical for Production**:
+
+- [x] **Conversation History (Context Awareness)**:
+
+  - [x] Backend: `process_query_request()` accepts `conversation_history` parameter
+  - [x] Backend: Build messages array with last 10 history messages + current query
+  - [x] Frontend: Extract last 10 messages from Redux state in `sendQuery` thunk
+  - [x] Frontend: Pass as `conversationHistory` in API request
+  - [x] LLM maintains context across conversation turns (can reference previous queries/answers)
+  - [x] Logging: Both frontend and backend log conversation history for debugging
+
+- [x] **Settings Integration (User Control)**:
+
+  - [x] Backend: Accept `temperature` and `max_tokens` parameters in `process_query_request()`
+  - [x] Backend: Pass settings to both Turn 1 and Turn 2 OpenAI API calls
+  - [x] Frontend: Store settings in Redux state (temperature: 0.7, maxTokens: 2000 defaults)
+  - [x] Frontend: ChatSettings UI component with enabled sliders
+  - [x] Frontend: Send current settings with every query
+
+- [x] **Database Query Fixes**:
+  - [x] Fix ORDER BY syntax: Use `query.order(column, desc=True)` instead of `query.order("column.desc")`
+  - [x] Prevents PostgREST parsing errors on first query attempt
+  - [x] Ensures queries work reliably on first try without retry needed
 
 ---
 
 **PAUSE**
 
 ---
+
+## Final Validation - PART A Complete
 
 ### AI PROMPT: Final Validation - PART A Complete (Responses API)
 

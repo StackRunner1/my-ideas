@@ -132,14 +132,48 @@ class ResponsesAPIOutput(BaseModel):
         return True, warnings
 
 
+class Message(BaseModel):
+    """Single message in conversation history."""
+
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
+
+class QuerySettings(BaseModel):
+    """Optional AI query settings."""
+
+    temperature: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=2.0,
+        description="Controls randomness. Lower = focused, higher = creative",
+    )
+    max_tokens: int = Field(
+        default=2000, ge=100, le=8192, description="Maximum response tokens"
+    )
+
+
 class SQLQueryRequest(BaseModel):
     """Request model for SQL query generation."""
+
+    model_config = {"populate_by_name": True}
 
     query: str = Field(
         ...,
         min_length=1,
         max_length=1000,
         description="Natural language question to convert to SQL",
+    )
+
+    conversation_history: Optional[List[Message]] = Field(
+        default=None,
+        alias="conversationHistory",
+        description="Previous messages in conversation for context",
+        max_length=20,
+    )
+
+    settings: Optional[QuerySettings] = Field(
+        default=None, description="Optional AI query settings"
     )
 
     schema_context: Optional[Dict[str, Any]] = Field(

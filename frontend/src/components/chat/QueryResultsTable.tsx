@@ -1,11 +1,11 @@
 /**
  * QueryResultsTable Component
- * 
+ *
  * Displays query results in a table format with pagination.
  */
 
-import { useState } from 'react';
-import { Button } from '../ui/button';
+import { useState } from "react";
+import { Button } from "../ui/button";
 import {
   Table,
   TableBody,
@@ -13,14 +13,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
+} from "../ui/table";
 
 interface QueryResultsTableProps {
   results: Array<Record<string, any>>;
   maxRows?: number;
 }
 
-export function QueryResultsTable({ results, maxRows = 10 }: QueryResultsTableProps) {
+export function QueryResultsTable({
+  results,
+  maxRows = 10,
+}: QueryResultsTableProps) {
   const [showAll, setShowAll] = useState(false);
 
   if (!results || results.length === 0) {
@@ -42,6 +45,10 @@ export function QueryResultsTable({ results, maxRows = 10 }: QueryResultsTablePr
     <div className="space-y-2">
       <div className="rounded border">
         <Table>
+          <caption className="sr-only">
+            Query results showing {results.length} row
+            {results.length !== 1 ? "s" : ""}
+          </caption>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
@@ -67,11 +74,7 @@ export function QueryResultsTable({ results, maxRows = 10 }: QueryResultsTablePr
 
       {hasMore && !showAll && (
         <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAll(true)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
             Show all {results.length} rows
           </Button>
         </div>
@@ -79,18 +82,14 @@ export function QueryResultsTable({ results, maxRows = 10 }: QueryResultsTablePr
 
       {showAll && hasMore && (
         <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAll(false)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowAll(false)}>
             Show less
           </Button>
         </div>
       )}
 
       <div className="text-xs text-muted-foreground">
-        {results.length} row{results.length !== 1 ? 's' : ''} returned
+        {results.length} row{results.length !== 1 ? "s" : ""} returned
       </div>
     </div>
   );
@@ -98,14 +97,14 @@ export function QueryResultsTable({ results, maxRows = 10 }: QueryResultsTablePr
 
 function formatValue(value: any): string {
   if (value === null || value === undefined) {
-    return 'null';
+    return "null";
   }
 
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
   }
 
-  if (typeof value === 'object') {
+  if (typeof value === "object") {
     return JSON.stringify(value);
   }
 

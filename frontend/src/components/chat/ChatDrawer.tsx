@@ -15,6 +15,7 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 import { ChatInterface } from "./ChatInterface";
+import { ChatSettings } from "./ChatSettings";
 
 interface ChatDrawerProps {
   open: boolean;
@@ -34,16 +35,21 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
         <div className="flex h-full flex-col">
           {/* Header */}
           <SheetHeader className="border-b px-6 py-4">
-            <SheetTitle>AI Assistant</SheetTitle>
-            <SheetDescription>
-              Let's have a chat about your ideas
-            </SheetDescription>
-            {totalTokens > 0 && (
-              <div className="flex gap-4 pt-2 text-xs text-muted-foreground">
-                <span>Tokens: {totalTokens.toLocaleString()}</span>
-                <span>Cost: ${totalCost.toFixed(4)}</span>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <SheetTitle>AI Assistant</SheetTitle>
+                <SheetDescription>
+                  Let's have a chat about your ideas
+                </SheetDescription>
+                {totalTokens > 0 && (
+                  <div className="flex gap-4 pt-2 text-xs text-muted-foreground">
+                    <span>Tokens: {totalTokens.toLocaleString()}</span>
+                    <span>Cost: ${totalCost.toFixed(4)}</span>
+                  </div>
+                )}
               </div>
-            )}
+              <ChatSettings />
+            </div>
           </SheetHeader>
 
           {/* Chat Interface */}

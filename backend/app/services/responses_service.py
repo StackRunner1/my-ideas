@@ -43,20 +43,29 @@ NOTES:
 
 
 def process_query_request(
-    agent_client: Client, user_query: str, schema_hints: Optional[Dict[str, Any]] = None
+    agent_client: Client,
+    user_query: str,
+    schema_hints: Optional[Dict[str, Any]] = None,
+    conversation_history: Optional[list] = None,
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
 ) -> QueryResult:
-    """Process query with multi-turn function calling.
+    """Process query with multi-turn function calling and conversation history.
 
     Flow:
-    1. Send user query to LLM with query_database tool
-    2. If LLM calls tool, execute SQL and return results
-    3. LLM sees results and formats natural response
-    4. Return final response to user
+    1. Build messages array with conversation history + new user query
+    2. Send to LLM with query_database tool
+    3. If LLM calls tool, execute SQL and return results
+    4. LLM sees results and formats natural response
+    5. Return final response to user
 
     Args:
         agent_client: RLS-enforced Supabase client
         user_query: Natural language question
         schema_hints: Optional additional schema info
+        conversation_history: Previous messages for context
+        temperature: LLM temperature (0.0-2.0)
+        max_tokens: Maximum response tokens
 
     Returns:
         QueryResult with LLM's formatted response
@@ -79,17 +88,31 @@ For general questions (greetings, help, etc.):
 - Respond conversationally without calling functions
 """
 
-        logger.info(f"[RESPONSES_API] Processing query: {user_query[:100]}")
+        # Build conversation messages
+        messages = []
+
+        # Add conversation history if provided
+        if conversation_history:
+            for msg in conversation_history[-10:]:  # Last 10 messages for context
+                messages.append({"role": msg["role"], "content": msg["content"]})
+
+        # Add current user query
+        messages.append({"role": "user", "content": user_query})
+
+        logger.info(
+            f"[RESPONSES_API] Processing query with {len(messages)} messages (including {len(conversation_history or [])} history)"
+        )
+        logger.info(f"[RESPONSES_API] Settings: temp={temperature}, max_tokens={max_tokens}")
 
         # ===== TURN 1: Initial LLM call with tools =====
         response = client.responses.create(
             model="gpt-4o-mini",
             instructions=system_instructions,
-            input=[{"role": "user", "content": user_query}],
+            input=messages,
             tools=ALL_TOOLS,  # Tools from centralized module
             tool_choice="auto",  # LLM decides if it needs the tool
-            temperature=0.7,
-            max_output_tokens=2000,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
         )
 
         logger.info(f"[RESPONSES_API] Turn 1 complete, status={response.status}")
@@ -203,8 +226,8 @@ For general questions (greetings, help, etc.):
             model="gpt-4o-mini",
             previous_response_id=response.id,  # Multi-turn conversation
             input=tool_results,  # Tool execution results
-            temperature=0.7,
-            max_output_tokens=2000,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
         )
 
         logger.info(f"[RESPONSES_API] Turn 2 complete, status={final_response.status}")
