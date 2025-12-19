@@ -46,6 +46,11 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
     app.include_router(ideas_router, prefix="/api/v1/ideas", tags=["ideas"])
 
+    @app.get("/ping")
+    async def ping():
+        """Simple ping endpoint with no dependencies - fastest health check."""
+        return {"status": "ok", "message": "pong"}
+
     @app.get("/health")
     async def health(request: Request):
         """Health check endpoint with request ID and database connectivity test."""
