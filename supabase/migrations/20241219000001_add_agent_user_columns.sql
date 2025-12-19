@@ -33,7 +33,7 @@ CHECK (
 CREATE POLICY "Users can read own agent metadata"
 ON user_profiles
 FOR SELECT
-USING (user_id = auth.uid());
+USING (id = auth.uid());
 
 -- Policy: Only service role can write agent credentials
 -- (This is implicitly handled by existing RLS - service role bypasses RLS)

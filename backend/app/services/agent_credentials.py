@@ -68,7 +68,7 @@ def store_agent_credentials(
                     "agent_created_at": "now()",
                 }
             )
-            .eq("user_id", user_id)
+            .eq("id", user_id)
             .execute()
         )
 
@@ -111,7 +111,7 @@ def get_agent_credentials(user_id: str) -> Optional[Tuple[str, str, str]]:
         result = (
             admin_client.table("user_profiles")
             .select("agent_user_id, agent_credentials_encrypted")
-            .eq("user_id", user_id)
+            .eq("id", user_id)
             .single()
             .execute()
         )

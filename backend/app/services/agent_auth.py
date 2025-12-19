@@ -100,7 +100,7 @@ def authenticate_agent_user(user_id: str) -> dict:
                 {
                     "agent_last_used_at": "now()",
                 }
-            ).eq("user_id", user_id).execute()
+            ).eq("id", user_id).execute()
         except Exception as e:
             logger.warning(f"Failed to update agent_last_used_at: {e}")
 
