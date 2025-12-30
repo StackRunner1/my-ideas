@@ -10,6 +10,8 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import type { Message } from "../../store/chatSlice";
 import { QueryResultsTable } from "./QueryResultsTable";
+import { ActionBadge } from "./ActionBadge";
+import { ToolResultCard } from "./ToolResultCard";
 
 interface MessageCardProps {
   message: Message;
@@ -62,7 +64,7 @@ export function MessageCard({ message }: MessageCardProps) {
             )}
           </div>
           <span className="text-xs font-medium">
-            {isUser ? "You" : "AI Assistant"}
+            {isUser ? "You" : message.metadata?.agentName || "AI Assistant"}
           </span>
           <span className="ml-auto text-xs opacity-70">
             {formatRelativeTime(message.timestamp)}
@@ -73,6 +75,39 @@ export function MessageCard({ message }: MessageCardProps) {
         <div className="space-y-3">
           {/* Main message */}
           <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+
+          {/* Agent Handoffs (for agent messages) */}
+          {!isUser &&
+            message.metadata?.handoffs &&
+            message.metadata.handoffs.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium">Agent Routing:</div>
+                <div className="flex flex-wrap gap-2">
+                  {message.metadata.handoffs.map((handoff, idx) => (
+                    <ActionBadge
+                      key={idx}
+                      type="handoff"
+                      from={handoff.from}
+                      to={handoff.to}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Tool Calls (for agent messages) */}
+          {!isUser &&
+            message.metadata?.toolCalls &&
+            message.metadata.toolCalls.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium">Tool Executions:</div>
+                <div className="space-y-2">
+                  {message.metadata.toolCalls.map((toolCall, idx) => (
+                    <ToolResultCard key={idx} toolCall={toolCall} />
+                  ))}
+                </div>
+              </div>
+            )}
 
           {/* SQL Query (for assistant messages) */}
           {!isUser && message.metadata?.generatedSql && (
@@ -158,6 +193,14 @@ export function MessageCard({ message }: MessageCardProps) {
 
                 {showMetadata && (
                   <div className="mt-2 space-y-1 rounded bg-background/10 p-2 text-xs">
+                    {message.metadata.confidence !== undefined && (
+                      <div className="flex justify-between">
+                        <span>Confidence:</span>
+                        <span className="font-mono">
+                          {(message.metadata.confidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    )}
                     {message.metadata.tokenUsage && (
                       <div className="flex justify-between">
                         <span>Tokens:</span>
