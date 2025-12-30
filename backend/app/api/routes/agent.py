@@ -9,7 +9,8 @@ Documentation:
 - Sessions: https://openai.github.io/openai-agents-python/sessions/
 """
 
-from typing import Any, Dict
+import time
+from typing import Any, Dict, List
 
 from agents import Runner, SQLiteSession
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,7 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from ...api.auth_utils import get_current_user
 from ...core.errors import APIError
 from ...core.logging import get_logger
-from ...models.agent import AgentChatRequest, AgentChatResponse
+from ...models.agent import (AgentChatRequest, AgentChatResponse, Handoff,
+                             ToolCall)
 from ...services.agent_auth import get_agent_client
 from ...services.app_agents import create_orchestrator
 
@@ -41,7 +43,7 @@ async def agent_chat(
     This endpoint:
     1. Creates/retrieves session for conversation continuity
     2. Creates orchestrator agent with user context
-    3. Runs agent with user query using Runner.run_sync
+    3. Runs agent with user message using Runner.run (async)
     4. Tracks actions, tool calls, and handoffs
     5. Returns structured response with agent output
 
@@ -70,11 +72,11 @@ async def agent_chat(
         Response to User
     """
     # Extract user ID and request ID
-    user_id = current_user["id"]
+    user_id = current_user["user"]["id"]
     request_id = getattr(request.state, "request_id", "unknown")
 
     logger.info(
-        f"Agent chat request from user {user_id}: '{request_body.query[:100]}...'",
+        f"Agent chat request from user {user_id}: '{request_body.message[:100]}...'",
         extra={"request_id": request_id, "user_id": user_id},
     )
 
@@ -96,37 +98,129 @@ async def agent_chat(
         session = sessions[session_id]
 
         # Create orchestrator agent with RLS-enforced client
+        # Note: User context will be passed via RunContextWrapper (see Unit 16.5)
         orchestrator = create_orchestrator(agent_client)
         logger.info(f"Created orchestrator agent for user {user_id}")
 
         # Run agent with user query
         # Following SDK pattern: https://openai.github.io/openai-agents-python/running_agents/
-        logger.info(f"Running agent with query: '{request_body.query}'")
-        result = Runner.run_sync(
-            agent=orchestrator,
-            user_message=request_body.query,
+        logger.info(f"Running agent with query: '{request_body.message}'")
+        start_time = time.time()
+
+        result = await Runner.run(
+            orchestrator,
+            request_body.message,
             session=session,
         )
 
+        execution_time = time.time() - start_time
         logger.info(
-            f"Agent execution complete. Final output length: {len(result.final_output)} chars"
+            f"Agent execution complete in {execution_time:.2f}s. Final output length: {len(result.final_output)} chars"
         )
 
-        # Extract actions and tool calls from result
-        # TODO: Parse result.messages for detailed action tracking
-        actions = []
-        tool_calls = []
-        final_agent = "Orchestrator"  # Track which agent provided final response
+        # Log result details for debugging
+        logger.info(f"Result has {len(result.new_items)} new_items")
+        logger.info(
+            f"Last agent: {result.last_agent.name if result.last_agent else 'None'}"
+        )
+
+        # Log each item type for debugging handoff issues
+        for i, item in enumerate(result.new_items):
+            item_type = type(item).__name__
+            logger.info(f"  new_items[{i}]: {item_type}")
+
+            # Log item details for handoffs
+            if item_type == "HandoffOutputItem":
+                logger.info(
+                    f"    ✅ HANDOFF FOUND: {getattr(item, 'source_agent', '?')} → {getattr(item, 'target_agent', '?')}"
+                )
+            elif item_type == "ToolCallOutputItem":
+                logger.info(
+                    f"    ✅ TOOL CALL FOUND: {getattr(item, 'tool_name', '?')}"
+                )
+            elif item_type == "MessageOutputItem":
+                content_preview = str(getattr(item, "content", ""))[:100]
+                logger.info(f"    📝 MESSAGE: {content_preview}...")
+
+        # Parse new_items to extract handoffs and tool calls
+        # SDK documentation: https://github.com/openai/openai-agents-python/blob/main/docs/results.md
+        handoffs: List[Handoff] = []
+        tool_calls: List[ToolCall] = []
+        final_agent_name = (
+            result.last_agent.name if result.last_agent else "Orchestrator"
+        )
+
+        # Iterate through new_items to track agent transitions and tool executions
+        for i, item in enumerate(result.new_items):
+            item_type = type(item).__name__
+
+            # Log item for debugging
+            logger.debug(f"Item {i}: type={item_type}")
+
+            # Check for handoffs using HandoffOutputItem
+            if item_type == "HandoffOutputItem":
+                from_agent = (
+                    item.source_agent.name
+                    if hasattr(item, "source_agent") and item.source_agent
+                    else "Unknown"
+                )
+                to_agent = (
+                    item.target_agent.name
+                    if hasattr(item, "target_agent") and item.target_agent
+                    else "Unknown"
+                )
+
+                handoff = Handoff(
+                    from_agent=from_agent,
+                    to_agent=to_agent,
+                    timestamp=int(time.time() * 1000),
+                )
+                handoffs.append(handoff)
+                logger.info(f"🔄 Handoff detected: {from_agent} → {to_agent}")
+
+            # Check for tool calls using ToolCallOutputItem
+            elif item_type == "ToolCallOutputItem":
+                tool_name = item.tool_name if hasattr(item, "tool_name") else "unknown"
+                tool_output = item.tool_output if hasattr(item, "tool_output") else None
+
+                # Parse tool output for success/error
+                tool_result = None
+                tool_error = None
+
+                if tool_output:
+                    if isinstance(tool_output, dict):
+                        if tool_output.get("success"):
+                            tool_result = tool_output.get("data")
+                        else:
+                            tool_error = tool_output.get("error")
+                    else:
+                        tool_result = str(tool_output)
+
+                    tool_call_obj = ToolCall(
+                        tool_name=tool_name,
+                        parameters={},  # Tool parameters not directly accessible from ToolCallOutputItem
+                        result=tool_result,
+                        error=tool_error,
+                    )
+                    tool_calls.append(tool_call_obj)
+                    logger.info(f"🔧 Tool call detected: {tool_name}")
+
+        # Log summary
+        logger.info(
+            f"Extracted {len(handoffs)} handoffs and {len(tool_calls)} tool calls"
+        )
 
         # For now, simple response structure
-        # Will enhance with detailed action/tool tracking in next iteration
         response = AgentChatResponse(
             success=True,
             response=result.final_output,
-            actions=actions,
-            tool_calls=tool_calls,
             session_id=session_id,
-            agent_used=final_agent,
+            handoffs=handoffs if handoffs else None,
+            tool_calls=tool_calls if tool_calls else None,
+            agent_name=final_agent_name,
+            confidence=None,  # TODO: Extract from agent reasoning
+            token_usage=None,  # TODO: Extract from result if available
+            cost=None,  # TODO: Calculate based on token usage
             error=None,
         )
 
@@ -145,9 +239,9 @@ async def agent_chat(
         return AgentChatResponse(
             success=False,
             response=f"I encountered an error while processing your request: {error_msg}",
-            actions=[],
-            tool_calls=[],
             session_id=request_body.session_id or "",
-            agent_used="System",
+            handoffs=None,
+            tool_calls=None,
+            agent_name="System",
             error=error_msg,
         )

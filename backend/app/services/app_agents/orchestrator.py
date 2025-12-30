@@ -29,6 +29,7 @@ def create_orchestrator(agent_client) -> Agent:
 
     Args:
         agent_client: RLS-enforced Supabase client for database operations
+        agent_client: RLS-enforced Supabase client for database operations
 
     Returns:
         Orchestrator Agent configured with handoffs to specialist agents
@@ -46,6 +47,7 @@ def create_orchestrator(agent_client) -> Agent:
         Handoffs are a first-class primitive in the SDK.
     """
     # Create specialist agents with RLS-enforced client
+    # Note: User context will be passed via RunContextWrapper (see Unit 16.5)
     ideas = create_ideas_agent()
     tags = create_tags_agent(agent_client)
 

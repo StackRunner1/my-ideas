@@ -147,25 +147,74 @@ class AgentChatRequest(BaseModel):
     conversation_history: Optional[List[Dict[str, str]]] = Field(
         default=None, description="Previous conversation messages in OpenAI format"
     )
-    conversation_id: Optional[str] = Field(
-        default=None, description="Optional conversation ID for tracking"
+    session_id: Optional[str] = Field(
+        default=None, description="Optional session ID for tracking"
     )
+
+
+class Handoff(BaseModel):
+    """Agent handoff information."""
+
+    from_agent: str = Field(alias="from", description="Agent handing off")
+    to_agent: str = Field(alias="to", description="Agent receiving handoff")
+    timestamp: int = Field(description="Unix timestamp of handoff")
+
+    class Config:
+        populate_by_name = True
+
+
+class ToolCall(BaseModel):
+    """Tool execution information."""
+
+    tool_name: str = Field(alias="toolName", description="Name of the tool executed")
+    parameters: Dict[str, Any] = Field(description="Parameters passed to the tool")
+    result: Optional[Any] = Field(
+        default=None, description="Result from tool execution"
+    )
+    error: Optional[str] = Field(
+        default=None, description="Error message if tool failed"
+    )
+
+    class Config:
+        populate_by_name = True
+
+
+class TokenUsage(BaseModel):
+    """Token usage information."""
+
+    prompt_tokens: int = Field(alias="promptTokens", description="Tokens in prompt")
+    completion_tokens: int = Field(
+        alias="completionTokens", description="Tokens in completion"
+    )
+    total_tokens: int = Field(alias="totalTokens", description="Total tokens used")
+
+    class Config:
+        populate_by_name = True
 
 
 class AgentChatResponse(BaseModel):
     """Response from the agent chat endpoint."""
 
-    message: str = Field(description="Agent's response message")
-    action: AgentAction = Field(description="Action the agent took or wants to take")
-    tool_result: Optional[ToolExecutionResult] = Field(
-        default=None, description="Result of tool execution (if action was TOOL_CALL)"
+    success: bool = Field(description="Whether the request succeeded")
+    response: str = Field(description="Agent's response message")
+    session_id: str = Field(alias="sessionId", description="Session ID for tracking")
+    handoffs: Optional[List[Handoff]] = Field(
+        default=None, description="List of agent handoffs that occurred"
     )
-    needs_confirmation: bool = Field(
-        default=False, description="Whether the action requires user confirmation"
+    tool_calls: Optional[List[ToolCall]] = Field(
+        default=None, alias="toolCalls", description="List of tool executions"
     )
-    confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Agent's confidence in the response"
+    agent_name: Optional[str] = Field(
+        default=None, alias="agentName", description="Name of the final agent"
     )
-    conversation_id: Optional[str] = Field(
-        default=None, description="Conversation ID for tracking"
+    confidence: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0, description="Agent's confidence in the response"
     )
+    token_usage: Optional[TokenUsage] = Field(
+        default=None, alias="tokenUsage", description="Token usage statistics"
+    )
+    cost: Optional[float] = Field(default=None, description="Estimated cost in USD")
+    error: Optional[str] = Field(default=None, description="Error message if failed")
+
+    class Config:
+        populate_by_name = True

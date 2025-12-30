@@ -89,6 +89,7 @@ def create_tag(
             logger.info(f"Item verified: item_id={item_id}")
 
         # Create the tag
+        # Note: user_id will be added via RunContextWrapper pattern (see Unit 16.5)
         logger.info(f"Creating tag in database: {tag_name}")
         tag_result = agent_client.from_("tags").insert({"name": tag_name}).execute()
 

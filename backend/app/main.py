@@ -4,6 +4,25 @@ Provides a minimal app with CORS and middleware that injects `x-request-id`
 and `x-duration-ms` headers, and exposes a `/health` endpoint.
 """
 
+# CRITICAL: Load environment variables BEFORE any other imports
+# The OpenAI Agents SDK looks for OPENAI_API_KEY as soon as it's imported
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Log that environment variables loaded successfully
+import logging
+
+logger = logging.getLogger(__name__)
+logger.info("✅ Environment variables loaded from .env")
+if os.getenv("OPENAI_API_KEY"):
+    key_preview = os.getenv("OPENAI_API_KEY")[:10] + "..."
+    logger.info(f"✅ OPENAI_API_KEY found: {key_preview}")
+else:
+    logger.error("❌ OPENAI_API_KEY not found in environment")
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware

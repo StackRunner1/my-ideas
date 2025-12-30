@@ -8,5 +8,6 @@ https://openai.github.io/openai-agents-python/tools/
 """
 
 from .create_tag import create_tag
+from .search_tags import search_tags
 
-__all__ = ["create_tag"]
+__all__ = ["create_tag", "search_tags"]
