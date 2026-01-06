@@ -1,8 +1,8 @@
 /**
  * ChatInterface Component
  *
- * Main chat interface for AI-powered database queries.
- * Users can send natural language questions and receive SQL queries with explanations.
+ * Main chat interface for AI-powered database queries and agent actions.
+ * Supports both Responses API (Part A) and Agent SDK (Part B) modes.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -18,24 +18,55 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { useChat } from "../../hooks/useChat";
-import { Message } from "../../store/chatSlice";
+import { Message, ChatMode } from "../../store/chatSlice";
 import { MessageCard } from "./MessageCard";
 import { ClearChatDialog } from "./ClearChatDialog";
 import { ChatLoadingState } from "./LoadingSkeleton";
+import { ChatModeToggle } from "./ChatModeToggle";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 import { toast } from "sonner";
 
-const EXAMPLE_QUERIES = [
-  "Show me all my ideas",
-  "What are my most recent ideas?",
-  "List all items with their tags",
-];
+const EXAMPLE_QUERIES: Record<ChatMode, string[]> = {
+  responses_api: [
+    "Show me all my ideas",
+    "What are my most recent ideas?",
+    "List all items with their tags",
+  ],
+  agent_sdk: [
+    "Create a tag called python",
+    "Create an idea called AI Project",
+    "Tag my latest idea with machine-learning",
+  ],
+};
 
 export function ChatInterface() {
-  const { messages, loading, error, sendMessage, clearChat } = useChat();
+  const {
+    messages,
+    loading,
+    error,
+    chatMode,
+    agentStatus,
+    sendMessage,
+    sendAgentMessage,
+    clearChat,
+    setChatMode,
+  } = useChat();
 
   const [input, setInput] = useState("");
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showModeChangeDialog, setShowModeChangeDialog] = useState(false);
+  const [pendingMode, setPendingMode] = useState<ChatMode | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,15 +82,34 @@ export function ChatInterface() {
     textareaRef.current?.focus();
   }, []);
 
+  // Load mode preference from localStorage
+  useEffect(() => {
+    const savedMode = localStorage.getItem("chatMode") as ChatMode | null;
+    if (
+      savedMode &&
+      (savedMode === "responses_api" || savedMode === "agent_sdk")
+    ) {
+      setChatMode(savedMode);
+    }
+  }, [setChatMode]);
+
   const handleSend = () => {
     if (!input.trim() || loading) return;
 
-    sendMessage(input.trim());
+    // Route to correct API based on mode
+    if (chatMode === "agent_sdk") {
+      sendAgentMessage(input.trim());
+      toast.success("Message sent to agent", {
+        description: "Agent is processing your request...",
+      });
+    } else {
+      sendMessage(input.trim());
+      toast.success("Query sent", {
+        description: "Processing your request...",
+      });
+    }
 
-    // Show success toast
-    toast.success("Query sent", {
-      description: "Processing your request...",
-    });
+    setInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -83,6 +133,41 @@ export function ChatInterface() {
     });
   };
 
+  const handleModeChange = (newMode: ChatMode) => {
+    // If there are messages, ask for confirmation
+    if (messages.length > 0) {
+      setPendingMode(newMode);
+      setShowModeChangeDialog(true);
+    } else {
+      // No messages, switch immediately
+      setChatMode(newMode);
+      localStorage.setItem("chatMode", newMode);
+      toast.success("Mode changed", {
+        description: `Switched to ${
+          newMode === "agent_sdk" ? "Agent SDK" : "Responses API"
+        }`,
+      });
+    }
+  };
+
+  const handleModeChangeConfirm = () => {
+    if (pendingMode) {
+      clearChat();
+      setChatMode(pendingMode);
+      localStorage.setItem("chatMode", pendingMode);
+      setShowModeChangeDialog(false);
+      setPendingMode(null);
+      toast.success("Mode changed", {
+        description: "Chat cleared and mode switched",
+      });
+    }
+  };
+
+  const handleModeChangeCancel = () => {
+    setShowModeChangeDialog(false);
+    setPendingMode(null);
+  };
+
   // Show error toast when error occurs
   useEffect(() => {
     if (error) {
@@ -94,6 +179,16 @@ export function ChatInterface() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Mode Toggle */}
+      <div className="mb-3 space-y-2">
+        <ChatModeToggle mode={chatMode} onModeChange={handleModeChange} />
+        <p className="text-xs text-muted-foreground px-1">
+          {chatMode === "responses_api"
+            ? "Ask questions about your data - read-only queries"
+            : "Take actions with AI agents - create, update, manage"}
+        </p>
+      </div>
+
       {/* Screen reader announcements */}
       <div
         role="status"
@@ -101,7 +196,10 @@ export function ChatInterface() {
         aria-atomic="true"
         className="sr-only"
       >
-        {loading && "AI is processing your query"}
+        {loading && chatMode === "agent_sdk" && "Agent is thinking"}
+        {loading &&
+          chatMode === "responses_api" &&
+          "AI is processing your query"}
         {!loading &&
           messages.length > 0 &&
           messages[messages.length - 1]?.content}
@@ -114,16 +212,22 @@ export function ChatInterface() {
             // Empty state with examples
             <div className="flex h-full flex-col items-center justify-center space-y-6 text-center">
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Let's have a chat</h3>
+                <h3 className="text-lg font-semibold">
+                  {chatMode === "responses_api"
+                    ? "Let's have a chat"
+                    : "Ready to take action"}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Ask about your ideas
+                  {chatMode === "responses_api"
+                    ? "Ask about your ideas"
+                    : "Create, update, and manage your ideas"}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <p className="text-sm font-medium">Try asking:</p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {EXAMPLE_QUERIES.map((query) => (
+                  {EXAMPLE_QUERIES[chatMode].map((query) => (
                     <Button
                       key={query}
                       variant="outline"
@@ -144,8 +248,13 @@ export function ChatInterface() {
                 <MessageCard key={message.id} message={message} />
               ))}
 
-              {/* Loading skeleton */}
-              {loading && <ChatLoadingState />}
+              {/* Agent thinking indicator */}
+              {loading &&
+                chatMode === "agent_sdk" &&
+                agentStatus === "thinking" && <ThinkingIndicator />}
+
+              {/* Loading skeleton for responses API */}
+              {loading && chatMode === "responses_api" && <ChatLoadingState />}
 
               {/* Scroll anchor */}
               <div ref={scrollRef} />
@@ -169,7 +278,11 @@ export function ChatInterface() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your ideas..."
+            placeholder={
+              chatMode === "responses_api"
+                ? "Ask about your ideas..."
+                : "Tell the agent what to do..."
+            }
             className="min-h-[80px] resize-none pr-10"
             disabled={loading}
             aria-label="Query input"
@@ -240,6 +353,30 @@ export function ChatInterface() {
         onOpenChange={setShowClearDialog}
         onConfirm={handleClearConfirm}
       />
+
+      {/* Mode change confirmation dialog */}
+      <AlertDialog
+        open={showModeChangeDialog}
+        onOpenChange={setShowModeChangeDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch Chat Mode?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Switching modes will clear your current conversation. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleModeChangeCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleModeChangeConfirm}>
+              Clear & Switch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
