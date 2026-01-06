@@ -148,8 +148,11 @@ class AgentChatRequest(BaseModel):
         default=None, description="Previous conversation messages in OpenAI format"
     )
     session_id: Optional[str] = Field(
-        default=None, description="Optional session ID for tracking"
+        default=None, alias="sessionId", description="Optional session ID for tracking"
     )
+
+    class Config:
+        populate_by_name = True
 
 
 class Handoff(BaseModel):
@@ -159,8 +162,7 @@ class Handoff(BaseModel):
     to_agent: str = Field(alias="to", description="Agent receiving handoff")
     timestamp: int = Field(description="Unix timestamp of handoff")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True, "serialize_by_alias": True}
 
 
 class ToolCall(BaseModel):
@@ -175,8 +177,7 @@ class ToolCall(BaseModel):
         default=None, description="Error message if tool failed"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True, "serialize_by_alias": True}
 
 
 class TokenUsage(BaseModel):
@@ -188,8 +189,7 @@ class TokenUsage(BaseModel):
     )
     total_tokens: int = Field(alias="totalTokens", description="Total tokens used")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True, "serialize_by_alias": True}
 
 
 class AgentChatResponse(BaseModel):
@@ -216,5 +216,4 @@ class AgentChatResponse(BaseModel):
     cost: Optional[float] = Field(default=None, description="Estimated cost in USD")
     error: Optional[str] = Field(default=None, description="Error message if failed")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True, "serialize_by_alias": True}

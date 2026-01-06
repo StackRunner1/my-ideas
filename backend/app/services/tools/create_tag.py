@@ -20,6 +20,7 @@ def create_tag(
     agent_client: Client,
     tag_name: str,
     item_id: Optional[int] = None,
+    user_id: Optional[str] = None,
 ) -> dict:
     """Create a new tag in the user's database.
 
@@ -30,6 +31,7 @@ def create_tag(
         agent_client: RLS-enforced Supabase client for the agent-user
         tag_name: Name of the tag to create (alphanumeric, hyphens, underscores, max 50 chars)
         item_id: Optional ID of an item to link the tag to
+        user_id: Human user's UUID for data ownership (required for tag creation)
 
     Returns:
         dict: Result with success status, created tag data, and any error messages
@@ -38,8 +40,8 @@ def create_tag(
         APIError: If validation fails or database operation fails
 
     Examples:
-        >>> result = create_tag(client, "urgent")
-        >>> result = create_tag(client, "bug-fix", item_id=42)
+        >>> result = create_tag(client, "urgent", user_id="47e8ca62-...")
+        >>> result = create_tag(client, "bug-fix", item_id=42, user_id="47e8ca62-...")
     """
     logger.info(f"create_tag called: tag_name={tag_name}, item_id={item_id}")
 
@@ -88,10 +90,23 @@ def create_tag(
                 }
             logger.info(f"Item verified: item_id={item_id}")
 
-        # Create the tag
-        # Note: user_id will be added via RunContextWrapper pattern (see Unit 16.5)
-        logger.info(f"Creating tag in database: {tag_name}")
-        tag_result = agent_client.from_("tags").insert({"name": tag_name}).execute()
+        # Validate user_id is provided
+        if not user_id:
+            error_msg = "user_id is required for tag creation (human user's UUID)"
+            logger.error(f"Validation failed: {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "error_code": "MISSING_USER_ID",
+            }
+
+        # Create the tag with human user's ID for ownership
+        logger.info(f"Creating tag in database: {tag_name} for user {user_id}")
+        tag_result = (
+            agent_client.from_("tags")
+            .insert({"name": tag_name, "user_id": user_id})
+            .execute()
+        )
 
         if not tag_result.data:
             error_msg = "Failed to create tag - no data returned"

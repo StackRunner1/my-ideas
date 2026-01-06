@@ -1,0 +1,47 @@
+name: TypeScript Types & Build
+
+on:
+  push:
+    branches: [main, dev, "codex/*", "feature/*", "chore/*"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/typescript-types.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/typescript-types.yml"
+  workflow_dispatch:
+
+jobs:
+  ts-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      # Run a typecheck if TypeScript is present (no hard fail if project is JS-only)
+      - name: Type check (tsc if present)
+        run: |
+          if [ -x node_modules/.bin/tsc ]; then
+            ./node_modules/.bin/tsc --noEmit --pretty false
+          else
+            echo "No local TypeScript found; skipping explicit tsc check"
+          fi
+
+      # Ensure the app compiles
+      - name: Build (Vite)
+        run: npm run build

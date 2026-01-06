@@ -14,13 +14,19 @@ from ...core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def search_tags(agent_client: Client, query: str, limit: Optional[int] = 10) -> dict:
+def search_tags(
+    agent_client: Client,
+    query: str,
+    limit: Optional[int] = 10,
+    user_id: Optional[str] = None,
+) -> dict:
     """Search for tags matching a query pattern.
 
     Args:
         agent_client: RLS-enforced Supabase client for database operations
         query: Search pattern (case-insensitive partial match)
         limit: Maximum number of results to return (default 10, max 50)
+        user_id: Human user's UUID to filter tags by ownership
 
     Returns:
         dict: Result with success status and tag data
@@ -42,18 +48,23 @@ def search_tags(agent_client: Client, query: str, limit: Optional[int] = 10) -> 
         if limit > 50:
             limit = 50
 
-        logger.info(f"[TOOL] search_tags: query='{query}', limit={limit}")
+        logger.info(
+            f"[TOOL] search_tags: query='{query}', limit={limit}, user_id={user_id}"
+        )
 
         # Search tags with case-insensitive pattern matching
-        # Note: user_id filtering will be added via RunContextWrapper pattern (see Unit 16.5)
-        # Using ilike for case-insensitive partial match
-        response = (
+        # Filter by user_id to only show human user's tags
+        query_builder = (
             agent_client.from_("tags")
             .select("id, name, created_at")
             .ilike("name", f"%{query}%")
-            .limit(limit)
-            .execute()
         )
+
+        # Filter by user_id if provided
+        if user_id:
+            query_builder = query_builder.eq("user_id", user_id)
+
+        response = query_builder.limit(limit).execute()
 
         tags = response.data if response.data else []
         count = len(tags)

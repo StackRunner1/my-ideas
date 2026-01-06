@@ -86,20 +86,40 @@ async def agent_chat(
         logger.info(f"Retrieved agent client for user {user_id}")
 
         # Get or create session for conversation continuity
-        session_id = request_body.session_id or f"session_{user_id}_{request_id}"
+        # CRITICAL: session_id must come from frontend to reuse existing session
+        received_session_id = request_body.session_id
+        logger.info(f"📥 Received session_id from request: {received_session_id}")
+
+        session_id = received_session_id or f"session_{user_id}_{request_id}"
+        logger.info(f"📌 Using session_id: {session_id}")
 
         if session_id not in sessions:
             # Create in-memory SQLite session (":memory:" = in-memory database)
             sessions[session_id] = SQLiteSession(session_id, ":memory:")
-            logger.info(f"Created new session: {session_id}")
+            logger.info(f"🆕 Created NEW session: {session_id}")
         else:
-            logger.info(f"Using existing session: {session_id}")
+            logger.info(f"♻️ REUSING existing session: {session_id}")
+            # Debug: Log current session items for memory debugging
+            try:
+                items = await sessions[session_id].get_items()
+                logger.info(f"📊 Session has {len(items)} items in history")
+                # Log each item type and preview for debugging memory issues
+                for i, item in enumerate(items):
+                    item_type = type(item).__name__
+                    if isinstance(item, dict):
+                        role = item.get("role", "?")
+                        content = str(item.get("content", ""))[:80]
+                        logger.info(f"  📝 Item {i}: role={role}, content={content}...")
+                    else:
+                        logger.info(f"  📝 Item {i}: {item_type}")
+            except Exception as e:
+                logger.warning(f"Could not get session items: {e}")
 
         session = sessions[session_id]
 
-        # Create orchestrator agent with RLS-enforced client
-        # Note: User context will be passed via RunContextWrapper (see Unit 16.5)
-        orchestrator = create_orchestrator(agent_client)
+        # Create orchestrator agent with RLS-enforced client and human user_id
+        # user_id is the HUMAN user's UUID who owns the data (not the agent-user)
+        orchestrator = create_orchestrator(agent_client, user_id)
         logger.info(f"Created orchestrator agent for user {user_id}")
 
         # Run agent with user query
@@ -118,6 +138,13 @@ async def agent_chat(
             f"Agent execution complete in {execution_time:.2f}s. Final output length: {len(result.final_output)} chars"
         )
 
+        # Log session state AFTER run to verify items were stored
+        try:
+            post_run_items = await session.get_items()
+            logger.info(f"📊 Session now has {len(post_run_items)} items AFTER run")
+        except Exception as e:
+            logger.warning(f"Could not get post-run session items: {e}")
+
         # Log result details for debugging
         logger.info(f"Result has {len(result.new_items)} new_items")
         logger.info(
@@ -131,13 +158,20 @@ async def agent_chat(
 
             # Log item details for handoffs
             if item_type == "HandoffOutputItem":
-                logger.info(
-                    f"    ✅ HANDOFF FOUND: {getattr(item, 'source_agent', '?')} → {getattr(item, 'target_agent', '?')}"
-                )
+                source = getattr(item, "source_agent", None)
+                target = getattr(item, "target_agent", None)
+                source_name = source.name if source else "?"
+                target_name = target.name if target else "?"
+                logger.info(f"    ✅ HANDOFF FOUND: {source_name} → {target_name}")
+            elif item_type == "ToolCallItem":
+                raw = getattr(item, "raw_item", None)
+                tool_name = getattr(raw, "name", "?") if raw else "?"
+                call_id = getattr(raw, "call_id", "?") if raw else "?"
+                logger.info(f"    ✅ TOOL CALL: {tool_name} (call_id={call_id})")
             elif item_type == "ToolCallOutputItem":
-                logger.info(
-                    f"    ✅ TOOL CALL FOUND: {getattr(item, 'tool_name', '?')}"
-                )
+                output = getattr(item, "output", None)
+                output_preview = str(output)[:100] if output else "None"
+                logger.info(f"    ✅ TOOL RESULT: {output_preview}")
             elif item_type == "MessageOutputItem":
                 content_preview = str(getattr(item, "content", ""))[:100]
                 logger.info(f"    📝 MESSAGE: {content_preview}...")
@@ -149,6 +183,11 @@ async def agent_chat(
         final_agent_name = (
             result.last_agent.name if result.last_agent else "Orchestrator"
         )
+
+        # Track ToolCallItems to correlate with ToolCallOutputItems
+        # ToolCallItem has raw_item.name (tool name) and raw_item.call_id
+        # ToolCallOutputItem has raw_item.call_id to match
+        pending_tool_calls: Dict[str, str] = {}  # call_id -> tool_name
 
         # Iterate through new_items to track agent transitions and tool executions
         for i, item in enumerate(result.new_items):
@@ -178,16 +217,40 @@ async def agent_chat(
                 handoffs.append(handoff)
                 logger.info(f"🔄 Handoff detected: {from_agent} → {to_agent}")
 
-            # Check for tool calls using ToolCallOutputItem
+            # Track ToolCallItem (invocation) - contains tool name
+            elif item_type == "ToolCallItem":
+                raw_item = getattr(item, "raw_item", None)
+                if raw_item:
+                    call_id = getattr(raw_item, "call_id", None)
+                    tool_name = getattr(raw_item, "name", "unknown")
+                    if call_id:
+                        pending_tool_calls[call_id] = tool_name
+                        logger.info(
+                            f"🔧 Tool invocation: {tool_name} (call_id={call_id})"
+                        )
+
+            # Check for tool calls using ToolCallOutputItem (result)
             elif item_type == "ToolCallOutputItem":
-                tool_name = item.tool_name if hasattr(item, "tool_name") else "unknown"
-                tool_output = item.tool_output if hasattr(item, "tool_output") else None
+                # Get call_id from raw_item to match with ToolCallItem
+                raw_item = getattr(item, "raw_item", {})
+                if isinstance(raw_item, dict):
+                    call_id = raw_item.get("call_id")
+                else:
+                    call_id = getattr(raw_item, "call_id", None)
+
+                # Look up tool name from pending_tool_calls
+                tool_name = (
+                    pending_tool_calls.get(call_id, "unknown") if call_id else "unknown"
+                )
+
+                # Get tool output from the item's output attribute
+                tool_output = getattr(item, "output", None)
 
                 # Parse tool output for success/error
                 tool_result = None
                 tool_error = None
 
-                if tool_output:
+                if tool_output is not None:
                     if isinstance(tool_output, dict):
                         if tool_output.get("success"):
                             tool_result = tool_output.get("data")
@@ -196,14 +259,14 @@ async def agent_chat(
                     else:
                         tool_result = str(tool_output)
 
-                    tool_call_obj = ToolCall(
-                        tool_name=tool_name,
-                        parameters={},  # Tool parameters not directly accessible from ToolCallOutputItem
-                        result=tool_result,
-                        error=tool_error,
-                    )
-                    tool_calls.append(tool_call_obj)
-                    logger.info(f"🔧 Tool call detected: {tool_name}")
+                tool_call_obj = ToolCall(
+                    tool_name=tool_name,
+                    parameters={},  # Tool parameters not directly accessible from ToolCallOutputItem
+                    result=tool_result,
+                    error=tool_error,
+                )
+                tool_calls.append(tool_call_obj)
+                logger.info(f"🔧 Tool result: {tool_name} (call_id={call_id})")
 
         # Log summary
         logger.info(

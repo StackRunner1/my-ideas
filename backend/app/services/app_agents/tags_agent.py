@@ -13,35 +13,36 @@ from agents import Agent, function_tool
 
 from supabase import Client
 
-from ..tools import create_tag, search_tags
+from ..tools import create_tag, edit_tag, link_tag_to_idea, search_tags
 from .prompts import TAGS_AGENT_INSTRUCTIONS
 
 
-def create_tags_agent(agent_client: Client) -> Agent:
+def create_tags_agent(agent_client: Client, user_id: str) -> Agent:
     """
     Create the Tags specialist agent.
 
     This agent handles all tag-related operations:
     - Create new tags
     - Search/retrieve tags
-    - Link tags to items
+    - Link tags to ideas
     - Validate tag names
 
     Args:
         agent_client: RLS-enforced Supabase client for database operations
+        user_id: Human user's UUID for data ownership (NOT the agent-user UUID)
 
     Returns:
         Agent configured for tags management
 
     Note:
-        Tools receive agent_client via closure for RLS enforcement.
+        Tools receive agent_client and user_id via closure.
         Following OpenAI Agent SDK pattern where tools are Python functions.
         All tools MUST be decorated with @function_tool for SDK compatibility.
-        User context (user_id) will be passed via RunContextWrapper (see Unit 16.5).
+        user_id is the HUMAN user who owns the data, passed through from endpoint.
     """
 
-    # Wrap create_tag with agent_client bound
-    # Note: user_id will be accessed via RunContextWrapper (see Unit 16.5)
+    # Wrap create_tag with agent_client and user_id bound via closure
+    # user_id is the HUMAN user's UUID who owns the data
     @function_tool
     def create_tag_tool(tag_name: str, idea_id: Optional[int] = None) -> str:
         """Create a new tag and optionally link it to an idea.
@@ -53,7 +54,7 @@ def create_tags_agent(agent_client: Client) -> Agent:
         Returns:
             Success message or error description.
         """
-        result = create_tag(agent_client, tag_name, idea_id)
+        result = create_tag(agent_client, tag_name, idea_id, user_id)
         return str(result)
 
     @function_tool
@@ -67,13 +68,41 @@ def create_tags_agent(agent_client: Client) -> Agent:
         Returns:
             Search results or error description.
         """
-        result = search_tags(agent_client, query, limit)
+        result = search_tags(agent_client, query, limit, user_id)
+        return str(result)
+
+    @function_tool
+    def link_tag_to_idea_tool(tag_id: int, idea_id: str) -> str:
+        """Link an existing tag to an idea.
+
+        Args:
+            tag_id: The integer ID of the tag to link.
+            idea_id: The UUID of the idea to link the tag to.
+
+        Returns:
+            Success message or error description.
+        """
+        result = link_tag_to_idea(agent_client, tag_id, idea_id, user_id)
+        return str(result)
+
+    @function_tool
+    def edit_tag_tool(tag_id: int, tag_name: str) -> str:
+        """Rename an existing tag.
+
+        Args:
+            tag_id: The integer ID of the tag to rename.
+            tag_name: New name for the tag (alphanumeric, hyphens, underscores, max 50 chars).
+
+        Returns:
+            Success message with updated tag details or error description.
+        """
+        result = edit_tag(agent_client, tag_id, tag_name, user_id)
         return str(result)
 
     tags_agent = Agent(
         name="Tags",
         instructions=TAGS_AGENT_INSTRUCTIONS,
-        tools=[create_tag_tool, search_tags_tool],
+        tools=[create_tag_tool, search_tags_tool, link_tag_to_idea_tool, edit_tag_tool],
         handoffs=[],  # Tags agent is a leaf specialist, no handoffs needed
     )
 

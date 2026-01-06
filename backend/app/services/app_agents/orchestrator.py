@@ -17,7 +17,7 @@ from .prompts import ORCHESTRATOR_INSTRUCTIONS
 from .tags_agent import create_tags_agent
 
 
-def create_orchestrator(agent_client) -> Agent:
+def create_orchestrator(agent_client, user_id: str) -> Agent:
     """
     Create the Orchestrator agent.
 
@@ -29,7 +29,7 @@ def create_orchestrator(agent_client) -> Agent:
 
     Args:
         agent_client: RLS-enforced Supabase client for database operations
-        agent_client: RLS-enforced Supabase client for database operations
+        user_id: Human user's UUID (for data ownership - NOT the agent-user UUID)
 
     Returns:
         Orchestrator Agent configured with handoffs to specialist agents
@@ -46,10 +46,10 @@ def create_orchestrator(agent_client) -> Agent:
         The orchestrator delegates to specialists, which execute tools.
         Handoffs are a first-class primitive in the SDK.
     """
-    # Create specialist agents with RLS-enforced client
-    # Note: User context will be passed via RunContextWrapper (see Unit 16.5)
-    ideas = create_ideas_agent()
-    tags = create_tags_agent(agent_client)
+    # Create specialist agents with RLS-enforced client and human user_id
+    # user_id is the HUMAN user's UUID (for data ownership), not the agent-user
+    ideas = create_ideas_agent(agent_client, user_id)
+    tags = create_tags_agent(agent_client, user_id)
 
     # Create orchestrator with handoffs to specialists
     orchestrator = Agent(

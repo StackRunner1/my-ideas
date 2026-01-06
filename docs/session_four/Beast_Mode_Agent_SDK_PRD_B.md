@@ -474,9 +474,38 @@ Orchestrator: Detects compound request (item creation + tagging)
             └──> Supabase INSERT (RLS enforced)
 ```
 
+### Chat History vs Agent Session Memory
+
+**⚠️ CRITICAL DISTINCTION**: These are related but separate concepts that must not be confused during implementation.
+
+| Concept                  | What it is                                   | Where it lives                       | Who manages it    |
+| ------------------------ | -------------------------------------------- | ------------------------------------ | ----------------- |
+| **Chat History (UI)**    | Messages displayed to user in chat interface | Frontend Redux `state.chat.messages` | Frontend code     |
+| **Agent Session Memory** | SDK's internal context for agent "memory"    | Backend `SQLiteSession` instance     | OpenAI Agents SDK |
+
+**How they relate**:
+
+- Chat History = What the **user sees** in the UI
+- Session Memory = What the **agent knows** when processing a message
+
+**SDK Session Memory Flow**:
+
+1. Frontend sends `sessionId` with request
+2. Backend retrieves `SQLiteSession` from `sessions` dict using `sessionId`
+3. `Runner.run()` automatically calls `session.get_items()` to prepend history to LLM context
+4. After run, SDK automatically calls `session.add_items()` to store new items
+5. Backend returns `sessionId` in response for frontend to reuse
+
+**Frontend Chat Messages Flow**:
+
+1. User sends message → message added to Redux `messages` array
+2. Response received → response message added to Redux `messages` array
+3. Messages are purely UI state, NOT sent to backend as conversation history
+4. Frontend does NOT build `conversationHistory` - SDK Sessions handle this automatically
+
 ---
 
-# PART B: AGENT SDK IMPLEMENTATION (Units 15-32)
+## IMPLEMENTATION OF PART B W/ AGENT INSTRUCTIONS AND TASK CHECKLISTS (Phase 4-8 | Units 15-30)
 
 **Goal**: Implement autonomous agentic system with tool-calling, multi-specialist architecture, and orchestration
 
@@ -492,7 +521,7 @@ Orchestrator: Detects compound request (item creation + tagging)
 
 - Folder MUST be `backend/app/services/app_agents/` (NOT `agents/` - conflicts with openai-agents package)
 - Import: `from agents import Agent, Runner` (package name is `agents`, NOT `openai_agents`)
-- Database table: `ideas` (NOT `items` - terminology must match database schema)
+- Database table: `ideas` (NOT `items` - terminology must match database schema, verify with learner)
 - Tool pattern: Functional (NOT OOP base class - simpler for this project)
 
 ### AI PROMPT: Phase 4 Implementation (Units 15-18)
@@ -567,15 +596,10 @@ The SDK automatically generates function schemas from type hints and docstrings,
 43. Verify error handling works for duplicates, invalid idea_id, RLS violations
 44. Verify @function_tool decorator applied to wrapper in tags_agent.py
 45. Verify decorated function has .name attribute (SDK requirement)
-46. Create Tags agent and verify tools array populated correctly
-47. Test AgentChatRequest/Response models serialize correctly with camelCase aliases
-48. Verify all three system prompts defined (Orchestrator, Ideas, Tags)
-49. Test prompt version tracking works
-50. Run backend server and verify no import errors
-51. Test /api/v1/agent/chat endpoint with simple query ("how are you?")
-52. Test tool execution via endpoint ("create a tag called python")
-53. Verify backend logs show handoffs and tool calls clearly
-54. Check database for created tag with correct user_id (RLS enforcement)
+46. Test AgentChatRequest/Response models serialize correctly with camelCase aliases
+47. Verify all three system prompts defined (Orchestrator, Ideas, Tags)
+48. Test prompt version tracking works
+49. Run backend server and verify no import errors
 
 After implementation:
 - Show me files for review
@@ -644,27 +668,60 @@ agent = Agent(name="Tags", tools=[create_tag_tool], instructions="...")
 
 ### Unit 17: Pydantic Models for Agent Responses
 
-- [ ] Create `backend/app/models/agent.py` module
-- [ ] Define `AgentAction` enum with values: answer, tool_call, clarify, refuse
-- [ ] Define `AgentChatRequest` model with fields:
+**Purpose**: Define request/response models for the Agent SDK endpoint with proper serialization for frontend compatibility.
+
+**⚠️ CRITICAL FOR AI ASSISTANTS**: All Pydantic models with Field aliases MUST be configured to serialize using aliases. Without this, JSON responses use snake_case instead of camelCase, breaking frontend integration.
+
+**Implementation Tasks**:
+
+- [x] Create `backend/app/models/agent.py` module
+- [x] Define `AgentAction` enum with values: answer, tool_call, clarify, refuse
+- [x] Define `AgentChatRequest` model with fields:
   - message (str) - user query
-  - session_id (Optional[str]) - SDK session ID for conversation continuity
+  - session_id (Optional[str]) with alias "sessionId" - SDK session ID for conversation continuity
   - conversation_history (Optional[List]) - DEPRECATED, not used with SDK Sessions (included for API compatibility but ignored)
-- [ ] Define `AgentChatResponse` model with fields:
+- [x] Define `AgentChatResponse` model with fields:
   - success (bool)
   - response (str)
-  - session_id (str) - return session ID for frontend to persist (CRITICAL for conversation continuity)
-  - handoffs (Optional[List[Handoff]])
-  - toolCalls (Optional[List[ToolCall]])
-  - agentName (Optional[str])
+  - session_id (str) with alias "sessionId" - return session ID for frontend to persist (CRITICAL)
+  - handoffs (Optional[List[Handoff]]) - agent routing information
+  - tool_calls (Optional[List[ToolCall]]) with alias "toolCalls" - tool execution details
+  - agent_name (Optional[str]) with alias "agentName"
   - confidence (Optional[float])
+  - token_usage (Optional[TokenUsage]) with alias "tokenUsage"
+  - cost (Optional[float])
   - error (Optional[str])
-- [ ] **CRITICAL**: Ensure session_id uses camelCase alias "sessionId" for frontend compatibility
-- [ ] Add model validation and examples in docstrings showing session_id usage patterns
-- [ ] Write model validation tests including session_id serialization to camelCase
-- [ ] Document all models with usage examples emphasizing session management flow
+- [x] Define `Handoff` model with fields:
+  - from_agent (str) with alias "from" - agent handing off
+  - to_agent (str) with alias "to" - agent receiving handoff
+  - timestamp (int) - Unix timestamp of handoff
+- [x] Define `ToolCall` model with fields:
+  - tool_name (str) with alias "toolName" - name of tool executed
+  - parameters (Dict[str, Any]) - parameters passed to tool
+  - result (Optional[Any]) - result from tool execution
+  - error (Optional[str]) - error message if tool failed
+- [x] Define `TokenUsage` model with fields:
+  - prompt_tokens (int) with alias "promptTokens"
+  - completion_tokens (int) with alias "completionTokens"
+  - total_tokens (int) with alias "totalTokens"
+- [x] Configure ALL models with Field aliases to use model_config with both populate_by_name and serialize_by_alias set to True
+- [x] Verify JSON serialization produces camelCase field names in response output
+- [ ] Write model validation tests including serialization verification
 
-**Note**: Simplified from original PRD specs. OpenAI Agent SDK handles most response formatting internally via Runner. We only need request/response models for FastAPI endpoint contract. Session management is handled via SDK's SQLiteSession class.
+**Model Configuration Requirement**:
+
+For any Pydantic model using Field aliases, the model_config must include BOTH settings:
+
+- `populate_by_name: True` - allows setting fields using Python name OR alias during instantiation
+- `serialize_by_alias: True` - ensures JSON output uses camelCase aliases instead of snake_case Python names
+
+Without `serialize_by_alias`, FastAPI returns snake_case in JSON responses even when aliases are defined, causing frontend state management to fail (e.g., `sessionId` expected but `session_id` received).
+
+**Files**:
+
+- `backend/app/models/agent.py` - All agent-related Pydantic models
+
+**Status**: ✅ IMPLEMENTED - All models created with proper serialization configuration
 
 ### Unit 18: Agent System Prompts
 
@@ -680,45 +737,272 @@ agent = Agent(name="Tags", tools=[create_tag_tool], instructions="...")
 
 **Status**: Core prompts implemented. Testing utilities pending.
 
+---
+
+**PAUSE - Phase 4 Complete**
+
+Foundational infrastructure complete (tools, decorators, models, prompts). Proceed to Phase 5 for agent implementation.
+
+---
+
+## Phase 5: Agent Implementation & Backend Endpoint (Units 19-22)
+
+**Goal**: Build the multi-agent system using the foundational pieces from Phase 4. Create Ideas and Tags specialist agents, the Orchestrator for routing, and the backend endpoint that ties everything together.
+
+**Why Now**: Phase 4 established the tool pattern, Pydantic models, and system prompts. Now assemble these into functional agents and expose via API endpoint.
+
+**⚠️ CRITICAL FOR AI ASSISTANTS:**
+
+- All tool wrappers MUST be decorated with `@function_tool` before passing to Agent
+- Use `await Runner.run()` in async endpoints (NOT `Runner.run_sync()`)
+- Session management via `SQLiteSession` is required for conversation continuity
+- Return `session_id` in response for frontend to maintain conversation state
+
+### AI PROMPT: Phase 5 Implementation (Units 19-22)
+
+```
+Help me implement Phase 5 - Agent Implementation & Backend Endpoint (Units 19-22):
+
+**CONTEXT**: Phase 4 completed foundational infrastructure:
+- Functional tool pattern with create_tag implemented
+- @function_tool decorator pattern established
+- Pydantic models for request/response with camelCase aliases
+- System prompts defined for Orchestrator, Ideas Agent, Tags Agent
+
+**TASK**: Build the multi-agent system and expose via backend endpoint.
+
+**Unit 19 - Ideas Specialist Agent**
+1. Create backend/app/services/app_agents/ideas_agent.py module
+2. Import Agent from agents package (NOT openai_agents)
+3. Import IDEAS_AGENT_INSTRUCTIONS from prompts module
+4. Define create_ideas_agent(agent_client, user_id) factory function
+5. Implement 5 tools: create_idea, search_ideas, list_ideas, get_idea, edit_idea
+6. Apply @function_tool decorator to all tool wrappers
+7. Bind agent_client and user_id via closure in tool wrappers
+8. Register all tools with Agent: tools=[create_idea_tool, search_ideas_tool, ...]
+9. Add comprehensive logging for agent decisions
+
+**Unit 20 - Tags Specialist Agent**
+10. Create backend/app/services/app_agents/tags_agent.py module
+11. Import Agent and function_tool from agents package
+12. Import TAGS_AGENT_INSTRUCTIONS from prompts module
+13. Define create_tags_agent(agent_client, user_id) factory function
+14. Implement 4 tools: create_tag, search_tags, link_tag_to_idea, edit_tag
+15. Apply @function_tool decorator to all tool wrappers
+16. Register all tools with Agent
+17. Update TAGS_AGENT_INSTRUCTIONS with tool descriptions
+
+**Unit 21 - Orchestrator Agent**
+18. Create backend/app/services/app_agents/orchestrator.py module
+19. Import Agent from agents package
+20. Import create_ideas_agent and create_tags_agent factory functions
+21. Import ORCHESTRATOR_INSTRUCTIONS from prompts module
+22. Define create_orchestrator(agent_client, user_id) factory function
+23. Initialize Ideas and Tags specialist agents
+24. Configure handoffs to both specialists
+25. Add comprehensive docstrings explaining architecture
+
+**Unit 22 - Agent SDK Backend Endpoint**
+26. Create backend/app/api/routes/agent.py module
+27. Import Runner and SQLiteSession from agents package
+28. Import create_orchestrator from services.app_agents
+29. Import get_agent_client from services.agent_auth
+30. Create POST /chat endpoint accepting AgentChatRequest
+31. Get authenticated user via get_current_user dependency
+32. Create/retrieve SQLiteSession for conversation continuity
+33. Use await Runner.run() (NOT run_sync) in async endpoint
+34. Extract handoffs and tool calls from result.new_items
+35. Correlate ToolCallItem with ToolCallOutputItem by call_id for tool names
+36. Return AgentChatResponse with session_id for frontend persistence
+37. Add comprehensive debug logging for session management
+38. Register router in main.py with prefix /api/v1
+
+**Phase 5 Validation**
+39. Run backend server and verify no import errors
+40. Test /api/v1/agent/chat endpoint with simple query ("how are you?")
+41. Test tool execution via endpoint ("create a tag called python")
+42. Verify backend logs show handoffs and tool calls clearly
+43. Check database for created tag with correct user_id (RLS enforcement)
+44. Test session continuity: send second message, verify context maintained
+45. Verify response includes sessionId (camelCase) for frontend
+
+After implementation:
+- Show me files for review
+- Guide me through testing
+- Ask me to confirm tests pass
+
+Mark completed tasks with [x]. Wait for approval before proceeding to Phase 6.
+```
+
 ### Unit 19: Ideas Specialist Agent Implementation
 
+**Purpose**: Create the Ideas specialist agent with all required tools for idea management operations.
+
+**⚠️ CRITICAL FOR AI ASSISTANTS**: The Ideas Agent requires functional tools to operate. All tool wrappers MUST be decorated with `@function_tool` before registration to avoid `AttributeError: 'function' object has no attribute 'name'`.
+
+**Agent Module Implementation**:
+
 - [x] Create `backend/app/services/app_agents/ideas_agent.py` module
-- [x] Import: `from agents import Agent` (package name is `agents`)
-- [x] Import: `from .prompts import IDEAS_AGENT_INSTRUCTIONS`
-- [x] Define `create_ideas_agent()` factory function
+- [x] Import Agent from agents package (package name is `agents`, NOT `openai_agents`)
+- [x] Import IDEAS_AGENT_INSTRUCTIONS from prompts module
+- [x] Define `create_ideas_agent(agent_client, user_id)` factory function accepting Supabase client and user ID
 - [x] Configure Agent with name="Ideas" and IDEAS_AGENT_INSTRUCTIONS
-- [x] Export singleton `ideas_agent` instance for reuse
-- [ ] Register tools: create_idea, search_ideas, update_idea, delete_idea (placeholders for future)
-- [ ] Implement tool wrapper functions with agent_client closure
-- [ ] **CRITICAL**: Apply `@function_tool` decorator to all tool wrappers (follow Unit 16 + Tags agent pattern)
-- [ ] Verify decorated tools have `.name` attribute before passing to `Agent(tools=[...])`
-- [ ] Add comprehensive logging for agent decisions
+- [x] Apply @function_tool decorator to all tool wrapper functions
+- [x] Verify all decorated tools have `.name` attribute before passing to Agent
+- [x] Register all 5 tools with Agent: create_idea_tool, search_ideas_tool, list_ideas_tool, get_idea_tool, edit_idea_tool
+- [x] Add comprehensive logging for agent decisions
 - [ ] Write agent tests: tool execution, routing behavior
 
-**Status**: Agent structure created. Tool implementations pending.
+**Tool 1: create_idea**:
 
-**Note**: When implementing Ideas tools (create_idea, search_ideas, etc.), follow the @function_tool decorator pattern from Unit 16 and Tags agent implementation. All tool wrappers MUST be decorated before registration to avoid `AttributeError: 'function' object has no attribute 'name'`.
+- [x] Create `backend/app/services/tools/create_idea.py` module
+- [x] Function accepts agent_client (Supabase Client), user_id (str), title (str), and optional content (str)
+- [x] Validate title is non-empty and max 200 characters
+- [x] Insert into ideas table with user_id for RLS ownership
+- [x] Return dict with success status and created idea data including id, title, content, created_at
+- [x] Handle errors including duplicate titles and RLS violations
+- [x] Add comprehensive logging
+
+**Tool 2: search_ideas**:
+
+- [x] Create `backend/app/services/tools/search_ideas.py` module
+- [x] Function accepts agent_client, user_id, query string, and optional limit (default 10)
+- [x] Implement text search using Supabase ilike or textSearch across title and content fields
+- [x] Filter by user_id for RLS enforcement
+- [x] Return dict with list of matching ideas
+- [x] Handle empty results gracefully
+
+**Tool 3: list_ideas**:
+
+- [x] Create `backend/app/services/tools/list_ideas.py` module
+- [x] Function accepts agent_client, user_id, optional limit (default 20), and optional offset (default 0)
+- [x] Implement paginated listing ordered by created_at descending (newest first)
+- [x] Filter by user_id for RLS enforcement
+- [x] Return dict with ideas list and pagination info
+
+**Tool 4: get_idea**:
+
+- [x] Create `backend/app/services/tools/get_idea.py` module
+- [x] Function accepts agent_client, user_id, and idea_id (int)
+- [x] Fetch single idea by ID with user_id filter for RLS enforcement
+- [x] Return dict with idea details including associated tags
+- [x] Handle not found with clear error message
+
+**Tool 5: edit_idea**:
+
+- [x] Create `backend/app/services/tools/edit_idea.py` module
+- [x] Function accepts agent_client, user_id, idea_id (str), and optional title, description, status
+- [x] Validate idea ownership by verifying idea belongs to user_id before updating
+- [x] Validate title is non-empty and max 200 characters if provided
+- [x] Validate status is one of 'draft', 'published', 'archived' if provided
+- [x] Require at least one field to update (title, description, or status)
+- [x] Update idea in database with provided fields only (partial update)
+- [x] Return dict with success status and updated idea data
+- [x] Handle errors: idea not found, access denied, validation failures
+- [x] Add comprehensive logging
+
+**Tool Registration**:
+
+- [x] In ideas_agent.py, import all tools from tools module
+- [x] Create @function_tool decorated wrapper functions binding agent_client and user_id via closure
+- [x] Update `backend/app/services/tools/__init__.py` to export all idea tools
+
+**Files Created**:
+
+- `backend/app/services/tools/create_idea.py`
+- `backend/app/services/tools/search_ideas.py`
+- `backend/app/services/tools/list_ideas.py`
+- `backend/app/services/tools/get_idea.py`
+- `backend/app/services/tools/edit_idea.py`
+
+**Files Modified**:
+
+- `backend/app/services/tools/__init__.py` - Added exports for idea tools
+- `backend/app/services/app_agents/ideas_agent.py` - Added tool wrappers and registration
+
+**Status**: ✅ IMPLEMENTED - Ideas Agent created with all 5 tools
 
 ### Unit 20: Tags Specialist Agent Implementation
 
-- [x] Create `backend/app/services/app_agents/tags_agent.py` module
-- [x] Import: `from agents import Agent, function_tool` (**CRITICAL**: must import function_tool decorator)
-- [x] Import: `from ..tools import create_tag, search_tags` (relative import from services/tools)
-- [x] Import: `from .prompts import TAGS_AGENT_INSTRUCTIONS`
-- [x] Define `create_tags_agent(agent_client)` factory function
-- [x] Configure Agent with name="Tags" and TAGS_AGENT_INSTRUCTIONS
-- [x] **CRITICAL**: Apply `@function_tool` decorator to create_tag wrapper function
-- [x] **CRITICAL**: Verify decorated function has `.name` attribute: `hasattr(create_tag_tool, 'name')`
-- [x] Update wrapper function to return `str` (SDK expects string outputs, not dict)
-- [x] Register create_tag tool with agent_client closure
-- [x] Implement search_tags tool with @function_tool decorator
-- [x] Register search_tags tool with agent_client closure
-- [ ] Register additional tools: link_tag, unlink_tag (future work)
-- [x] Implement tool wrapper binding agent_client to create_tag
-- [x] Add docstrings for all tool wrappers
-- [ ] Write agent tests: tag creation, tag search, tag linking
+**Purpose**: Create the Tags specialist agent with all required tools for tag management operations including creating tags, searching tags, and linking tags to ideas.
 
-**Status**: Core agent + create_tag + search_tags tools implemented with @function_tool decorator. Decorator error FIXED. Ready for validation.
+**⚠️ CRITICAL FOR AI ASSISTANTS**: All tool wrappers MUST be decorated with `@function_tool` before registration. The SDK expects tools to have a `.name` attribute which the decorator provides.
+
+**Agent Module Implementation**:
+
+- [x] Create `backend/app/services/app_agents/tags_agent.py` module
+- [x] Import Agent and function_tool from agents package (CRITICAL: must import function_tool decorator)
+- [x] Import tools from tools module: create_tag, search_tags, link_tag_to_idea
+- [x] Import TAGS_AGENT_INSTRUCTIONS from prompts module
+- [x] Define `create_tags_agent(agent_client, user_id)` factory function accepting Supabase client and user ID
+- [x] Configure Agent with name="Tags" and TAGS_AGENT_INSTRUCTIONS
+- [x] Apply @function_tool decorator to all tool wrapper functions
+- [x] Verify all decorated tools have `.name` attribute before passing to Agent
+- [x] Update wrapper functions to return str (SDK expects string outputs, not dict)
+- [x] Register all 4 tools with Agent: create_tag_tool, search_tags_tool, link_tag_to_idea_tool, edit_tag_tool
+- [x] Add docstrings for all tool wrappers (SDK uses these for LLM function calling schema)
+- [ ] Write agent tests: tag creation, tag search, tag linking, tag editing
+
+**Tool 1: create_tag** (implemented in Unit 15):
+
+- [x] Tool already implemented in `backend/app/services/tools/create_tag.py`
+- [x] Create @function_tool decorated wrapper binding agent_client and user_id via closure
+- [x] Register with Agent tools list
+
+**Tool 2: search_tags**:
+
+- [x] Create `backend/app/services/tools/search_tags.py` module
+- [x] Function accepts agent_client, user_id, query string, and optional limit
+- [x] Implement text search using Supabase ilike across tag name field
+- [x] Filter by user_id for RLS enforcement
+- [x] Return dict with list of matching tags
+- [x] Create @function_tool decorated wrapper in tags_agent.py
+
+**Tool 3: link_tag_to_idea**:
+
+- [x] Create `backend/app/services/tools/link_tag_to_idea.py` module
+- [x] Function accepts agent_client, user_id, tag_id (int), and idea_id (int)
+- [x] Validate tag ownership by verifying tag belongs to user_id
+- [x] Validate idea ownership by verifying idea belongs to user_id
+- [x] Check for existing link in idea_tags junction table to prevent duplicates
+- [x] Insert into idea_tags table with idea_id and tag_id
+- [x] Return dict with success status and link details
+- [x] Handle errors: tag not found, idea not found, already linked, RLS violations
+- [x] Add comprehensive logging
+- [x] Create @function_tool decorated wrapper in tags_agent.py with docstring explaining usage
+
+**Tool 4: edit_tag**:
+
+- [x] Create `backend/app/services/tools/edit_tag.py` module
+- [x] Function accepts agent_client, user_id, tag_id (int), and tag_name (str)
+- [x] Validate tag ownership by verifying tag belongs to user_id before updating
+- [x] Validate new tag_name format (alphanumeric, hyphens, underscores, max 50 chars)
+- [x] Check for duplicate tag names to prevent naming conflicts
+- [x] Update tag name in database
+- [x] Return dict with success status and updated tag data including old and new names
+- [x] Handle errors: tag not found, access denied, duplicate name, validation failures
+- [x] Add comprehensive logging
+- [x] Create @function_tool decorated wrapper in tags_agent.py with docstring explaining usage
+
+**Prompt Update**:
+
+- [x] Update TAGS_AGENT_INSTRUCTIONS in prompts.py to include link_tag_to_idea tool
+- [x] Add example usage for linking tags to ideas
+- [x] Add instruction to use search_tags to find tag_id when user references tag by name
+- [x] Add context awareness instruction to check conversation history for recently created tags and ideas
+
+**Files Created**:
+
+- `backend/app/services/tools/link_tag_to_idea.py`
+- `backend/app/services/tools/edit_tag.py`
+
+**Files Modified**:
+
+- `backend/app/services/tools/__init__.py` - Added exports for search_tags, link_tag_to_idea, and edit_tag
+- `backend/app/services/app_agents/tags_agent.py` - Added all tool wrappers and registration
+- `backend/app/services/app_agents/prompts.py` - Updated TAGS_AGENT_INSTRUCTIONS with new tools
+
+**Status**: ✅ IMPLEMENTED - Tags Agent created with all 4 tools (create_tag, search_tags, link_tag_to_idea, edit_tag)
 
 ### Unit 21: Orchestrator Agent Implementation
 
@@ -737,119 +1021,133 @@ agent = Agent(name="Tags", tools=[create_tag_tool], instructions="...")
 
 **Status**: Core orchestrator implemented with handoffs. Session management pending.
 
-### Unit 22: Agent SDK Backend Endpoint
+---
 
-- [x] Create `POST /api/v1/agent/chat` endpoint in `backend/app/api/routes/agent.py`
-- [x] Import: `from agents import Runner, SQLiteSession` (NOT openai_agents)
-- [x] Import: `from ...services.app_agents import create_orchestrator`
-- [x] Import: `from ...services.agent_auth import get_agent_client`
-- [x] Implement `AgentChatRequest` and `AgentChatResponse` Pydantic models
-- [x] Get authenticated user from session via `get_current_user` dependency
-- [x] Access user ID correctly using nested structure `current_user["user"]["id"]` matching auth system
-- [x] Get RLS-enforced agent_client via `get_agent_client(user_id)`
-- [x] Create orchestrator agent with agent_client
-- [x] Use correct field name `request_body.message` not `request_body.query` matching AgentChatRequest model
-- [x] Use async pattern `await Runner.run()` not `Runner.run_sync()` in async endpoint to avoid event loop conflicts
-- [x] Pass agent and message as positional arguments to Runner.run, session as keyword argument
-- [x] **Session Management Implementation (CRITICAL for conversation continuity)**:
-  - Create/retrieve SQLiteSession from in-memory sessions dictionary: `sessions: dict[str, SQLiteSession] = {}`
-  - If `request_body.session_id` provided, reuse existing session (enables multi-turn conversations)
-  - If no `session_id`, generate new: `f"session_{user_id}_{request_id}"`
-  - Store session in dictionary for reuse across requests: `sessions[session_id] = SQLiteSession(session_id, ":memory:")`
-  - Sessions use in-memory SQLite (`:memory:`) - sufficient for demo/learning purposes
-  - **CRITICAL**: Always return `session_id` in AgentChatResponse for frontend persistence
-  - SDK Sessions automatically manage conversation history via `session.get_items()` and `session.add_items()`
-  - No manual conversation history building required - SDK handles this internally
-  - Documentation: https://github.com/openai/openai-agents-python/blob/main/docs/sessions/index.md
-- [x] Return agent response with session_id (essential for frontend to maintain conversation continuity)
-- [ ] **Out of Scope**: Upgrade to persistent file-based sessions: `SQLiteSession(session_id, "agent_sessions.db")` for persistence across server restarts
-- [ ] Implement rate limiting (20 agent requests per minute per user)
-- [ ] Add request ID tracking through entire agent pipeline
-- [ ] Enhance error handling to return safe messages
-- [ ] Add comprehensive endpoint documentation with examples
-- [ ] Write endpoint tests: tool execution, handoffs, errors
+### Unit 22: Agent SDK Backend Endpoint - Complete Implementation Guide
 
-**Implementation Notes - Common Pitfalls Resolved**:
+**Purpose**: Create the `/api/v1/agent/chat` endpoint that serves as the entry point for the Agent SDK system. This endpoint receives user messages, creates the orchestrator agent with specialist handoffs, manages conversation sessions, executes the agent pipeline via Runner.run(), and returns structured responses with tool call and handoff information.
 
-- **Tool Registration Error (CRITICAL)**: Tools passed to `Agent(tools=[...])` MUST be decorated with `@function_tool` decorator from agents package.
+**⚠️ CRITICAL FOR AI ASSISTANTS**: This unit documents the complete, tested implementation pattern for the agent endpoint. All patterns described here have been validated through implementation and resolve common pitfalls discovered during development.
 
-  - **Problem**: Passing raw Python functions or plain wrapper functions without decorator
-  - **Symptom**: `AttributeError: 'function' object has no attribute 'name'` when SDK tries to access `t.name` on tools
-  - **Root Cause**: Python functions have `.__name__` attribute (with underscores), but SDK expects `.name` attribute (no underscores) which the decorator provides
-  - **Solution**: Import `from agents import function_tool` and decorate all tool wrappers: `@function_tool`
-  - **Example**:
+**Endpoint Module Setup**:
 
-    ```python
-    from agents import function_tool, Agent
+- [x] Create `backend/app/api/routes/agent.py` module
+- [x] Import Runner and SQLiteSession from agents package (package name is `agents`, NOT `openai_agents`)
+- [x] Import create_orchestrator from services.app_agents module
+- [x] Import get_agent_client from services.agent_auth module for RLS-enforced database access
+- [x] Import AgentChatRequest and AgentChatResponse Pydantic models from models.agent
+- [x] Import get_current_user dependency for authentication
+- [x] Create APIRouter with prefix "/agent" and tags for OpenAPI documentation
+- [x] Register router in main.py with prefix "/api/v1"
 
-    @function_tool
-    async def create_tag_tool(tag_name: str, idea_id: Optional[int] = None) -> str:
-        """Create a new tag and optionally link to an idea."""
-        result = create_tag(agent_client, tag_name, idea_id)
-        return str(result)
+**Authentication and User Context**:
 
-    agent = Agent(name="Tags", tools=[create_tag_tool])  # ✅ Decorated function has .name
-    ```
+- [x] Add get_current_user dependency to endpoint function signature
+- [x] Extract user ID using nested structure: `current_user["user"]["id"]` (auth system returns nested dict)
+- [x] Obtain RLS-enforced Supabase client via `get_agent_client(user_id)` for database operations
+- [x] Pass both agent_client and user_id to orchestrator factory function
+- [x] Handle case where user has no stored agent credentials (return helpful error message)
 
-  - **Verification**: Check `hasattr(tool_function, 'name')` returns `True` before passing to Agent
-  - **SDK Reference**: https://openai.github.io/openai-agents-python/tools/#function-tools
-  - **Error Location**: SDK crashes at `agents/run.py:599` when building tool metadata: `[t.name for t in all_tools]`
+**Request Handling**:
 
-- **Environment Loading (CRITICAL)**: `load_dotenv()` must be called at the VERY TOP of `main.py` BEFORE any other imports. The OpenAI Agents SDK looks for `OPENAI_API_KEY` environment variable as soon as the `agents` package is imported anywhere in the codebase. If `.env` is not loaded first, the SDK will raise `OpenAIError: The api_key client option must be set`. Add this pattern at top of `main.py`:
+- [x] Define endpoint as `POST /chat` accepting AgentChatRequest body
+- [x] Extract message from `request_body.message` field (NOT `query` - distinguishes from Responses API)
+- [x] Extract optional session_id from `request_body.session_id` for conversation continuity
+- [x] Generate request_id for logging and session identification: `str(uuid.uuid4())[:8]`
+- [x] Log incoming request with user_id, message preview, and session_id
 
-  ```python
-  # CRITICAL: Load environment variables BEFORE any other imports
-  import os
-  from dotenv import load_dotenv
-  load_dotenv()
+**Session Management Implementation**:
 
-  # Optionally log that env vars loaded
-  import logging
-  logger = logging.getLogger(__name__)
-  logger.info("✅ Environment variables loaded from .env")
-  if os.getenv("OPENAI_API_KEY"):
-      key_preview = os.getenv("OPENAI_API_KEY")[:20] + "..."
-      logger.info(f"✅ OPENAI_API_KEY found: {key_preview}")
+- [x] Create module-level sessions dictionary: `sessions: dict[str, SQLiteSession] = {}`
+- [x] If request provides session_id, attempt to reuse existing session from dictionary
+- [x] If no session*id provided, generate new one: `f"session*{user*id}*{request_id}"`
+- [x] Create SQLiteSession with in-memory storage: `SQLiteSession(session_id, ":memory:")`
+- [x] Store session in dictionary for reuse: `sessions[session_id] = session`
+- [x] SDK Sessions automatically manage conversation history (no manual history building required)
+- [x] Always return session_id in response for frontend to persist and send with subsequent requests
 
-  from fastapi import FastAPI, Request
-  # ... rest of imports
-  ```
+**Session Debug Logging** (essential for troubleshooting continuity issues):
 
-````
+- [x] Log received session_id from request to verify frontend is sending it
+- [x] Log whether creating NEW session or REUSING existing session
+- [x] Log session item count when reusing to verify history is accumulating
+- [x] Log new_items count after Runner.run() to verify items are being stored
 
-- **RunResult Object Structure (CRITICAL)**: The `RunResult` object from `await Runner.run()` does NOT have a `messages` attribute. Instead, use:
-  - `result.final_output` - the final response string from the last agent
-  - `result.new_items` - list of `RunItem` objects (handoffs, tool calls, messages)
-  - `result.last_agent` - the agent that finished execution
-  - Documentation: https://github.com/openai/openai-agents-python/blob/main/docs/results.md
-  - Parse `new_items` to extract handoffs and tool calls:
-    ```python
-    for item in result.new_items:
-        item_type = type(item).__name__
-        if item_type == "HandoffOutputItem":
-            # Extract from_agent and to_agent from item.source_agent.name and item.target_agent.name
-        elif item_type == "ToolCallOutputItem":
-            # Extract tool_name and tool_output from item attributes
-    ```
-- **Session Management (CRITICAL for conversation continuity)**: The OpenAI Agents SDK provides built-in session memory via `SQLiteSession` to maintain conversation history automatically. Key implementation points:
-  - **Backend Pattern**: Create `sessions: dict[str, SQLiteSession] = {}` dictionary to store sessions in memory
-  - **Backend Session Retrieval**: If `request_body.session_id` provided, reuse existing session from dictionary for conversation continuity
-  - **Backend Session Creation**: If no `session_id`, generate new one: `f"session_{user_id}_{request_id}"` and create `SQLiteSession(session_id, ":memory:")`
-  - **Backend Runner Integration**: Pass session to `Runner.run(agent, message, session=session)` - SDK automatically retrieves and appends conversation history
-  - **Backend Response**: Always return `session_id` in AgentChatResponse for frontend to persist and reuse
-  - **Frontend State**: Store `agentSessionId: string | null` in Redux ChatState (separate from messages array)
-  - **Frontend Request**: Pass stored sessionId with each request: `sendAgentMessageAPI(message, { sessionId: state.chat.agentSessionId })`
-  - **Frontend Response Handling**: Save returned sessionId to Redux: `dispatch(setAgentSessionId(response.sessionId))` after successful response
-  - **Frontend Session Clearing**: Clear `agentSessionId` when switching modes or starting new conversation to prevent context leakage
-  - **DO NOT build conversationHistory manually** - SDK Sessions handle this automatically via `session.get_items()` and `session.add_items()`
-  - **Session Lifecycle**: Backend sessions persist in memory until server restart; upgrade to file-based for production: `SQLiteSession(session_id, "agent_sessions.db")`
-  - **Documentation**: https://github.com/openai/openai-agents-python/blob/main/docs/sessions/index.md
-  - **Advanced Options (Out of Scope)**: SQLAlchemySession (PostgreSQL/MySQL), AdvancedSQLiteSession (branching), EncryptedSession (encryption wrapper)
-- Authentication dependency returns nested structure requiring `current_user["user"]["id"]` access pattern
-- AgentChatRequest uses `message` field not `query` to distinguish from Responses API
-- FastAPI async endpoints require `await Runner.run()` not `Runner.run_sync()` - sync method creates event loop conflicts
-- Runner.run takes positional arguments for agent and message, keyword arguments for session and config
-- Agent credentials must exist in user_profiles table for existing users (auto-created during signup for new users)
+**Agent Pipeline Execution**:
+
+- [x] Create orchestrator agent: `orchestrator = create_orchestrator(agent_client, user_id)`
+- [x] Use async Runner.run pattern (NOT Runner.run_sync which causes event loop conflicts in async endpoints)
+- [x] Pass positional arguments for agent and message: `Runner.run(orchestrator, message, session=session)`
+- [x] Await the result: `result = await Runner.run(...)`
+- [x] Extract final response: `result.final_output`
+- [x] Extract last agent name: `result.last_agent.name` for agentName field in response
+
+**Result Processing - Handoff Extraction**:
+
+- [x] Initialize empty handoffs list for response
+- [x] Iterate through `result.new_items` to find HandoffOutputItem types
+- [x] For HandoffOutputItem: extract source_agent.name and target_agent.name
+- [x] Build Handoff objects with from_agent, to_agent, and timestamp fields
+- [x] Log handoffs with clear formatting for debugging
+
+**Result Processing - Tool Call Extraction** (CRITICAL pattern):
+
+- [x] Initialize empty tool_calls list and pending_tool_calls dict for correlation
+- [x] Understand SDK item type separation: ToolCallItem contains tool name, ToolCallOutputItem contains result
+- [x] For ToolCallItem: extract tool name from `item.raw_item.name` and call_id from `item.raw_item.call_id`
+- [x] Store in pending_tool_calls dictionary: `pending_tool_calls[call_id] = tool_name`
+- [x] For ToolCallOutputItem: extract call_id and look up tool name from pending_tool_calls
+- [x] Extract tool output from `item.output`
+- [x] Build ToolCall objects with tool_name, parameters (if available), and result
+- [x] Log tool invocations and results with clear formatting
+
+**Response Construction**:
+
+- [x] Build AgentChatResponse with all required fields
+- [x] Set success=True for successful execution, False for errors
+- [x] Set response to result.final_output
+- [x] Set session_id to the session ID used (CRITICAL for frontend conversation continuity)
+- [x] Set handoffs list (may be empty if no routing occurred)
+- [x] Set tool_calls list (may be empty if no tools were called)
+- [x] Set agent_name to the last agent that executed
+- [x] Verify model serialization uses camelCase aliases (requires serialize_by_alias in model config)
+
+**Error Handling**:
+
+- [x] Wrap agent execution in try/except block
+- [x] Catch agent credential errors and return helpful message about credential setup
+- [x] Catch general exceptions and log full traceback
+- [x] Return AgentChatResponse with success=False and error message for failures
+- [x] Never expose internal error details to frontend (security)
+
+**Environment Configuration Requirement**:
+
+- [x] Ensure load_dotenv() called at TOP of main.py BEFORE any imports
+- [x] OpenAI Agents SDK reads OPENAI_API_KEY on import - must be available immediately
+- [x] Without early load_dotenv(), SDK raises `OpenAIError: The api_key client option must be set`
+
+**Files Created**:
+
+- `backend/app/api/routes/agent.py` - Complete endpoint implementation
+
+**Files Modified**:
+
+- `backend/app/main.py` - Registered agent router with prefix "/api/v1"
+- `backend/app/main.py` - Added load_dotenv() at very top before imports
+
+**Common Pitfalls Resolved**:
+
+| Pitfall                                 | Symptom                                                          | Solution                                                             |
+| --------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Missing @function_tool decorator        | `AttributeError: 'function' object has no attribute 'name'`      | Decorate all tool wrappers with `@function_tool` from agents package |
+| Late environment loading                | `OpenAIError: The api_key client option must be set`             | Call `load_dotenv()` at top of main.py before any imports            |
+| Using Runner.run_sync in async endpoint | Event loop conflicts, hangs                                      | Use `await Runner.run()` in async endpoints                          |
+| Accessing result.messages               | `AttributeError: 'RunResult' object has no attribute 'messages'` | Use `result.final_output`, `result.new_items`, `result.last_agent`   |
+| Tool name from ToolCallOutputItem       | Tool names display as "?" or "unknown"                           | Correlate ToolCallItem and ToolCallOutputItem by call_id             |
+| Session not persisting                  | Agent loses context between messages                             | Return session_id in response; frontend must send it back            |
+| snake_case in JSON response             | Frontend receives session_id instead of sessionId                | Add `serialize_by_alias: True` to Pydantic model config              |
+
+**Status**: ✅ IMPLEMENTED - Endpoint functional with session management, handoff extraction, and tool call correlation
 
 ---
 
@@ -891,13 +1189,13 @@ Backend must log all handoffs and tool calls with clear formatting:
 
 ---
 
-**PAUSE - Phase 4 Complete**
+**PAUSE - Phase 5 Complete**
 
-Backend core infrastructure complete. Proceed to Phase 5 for frontend integration and visual validation.
+Backend agent system complete. Proceed to Phase 6 for frontend integration and visual validation.
 
 ---
 
-## Phase 5: Frontend Integration & UI Validation (Units 23-25)
+## Phase 6: Frontend Integration & UI Validation (Units 23-26)
 
 **Goal**: Make Agent SDK visible and testable via chat interface. Demonstrate handoffs, tool calls, and agent reasoning in UI components.
 
@@ -910,10 +1208,10 @@ Backend core infrastructure complete. Proceed to Phase 5 for frontend integratio
 - **Backend Logging**: Log all handoffs and tool executions with clear formatting and timestamps
 - **Frontend Visibility**: Users see full agent decision-making process (thinking → routing → tool execution → result)
 
-### AI PROMPT: Phase 5 Implementation (Frontend Integration - Units 23-25)
+### AI PROMPT: Phase 6 Implementation (Frontend Integration - Units 23-26)
 
 ```
-Help me implement Phase 5 - Frontend Integration & UI Validation:
+Help me implement Phase 6 - Frontend Integration & UI Validation:
 
 **CONTEXT**: Phase 4 completed backend - orchestrator, specialists, create_tag tool functional.
 - Server running, /api/v1/agent/chat endpoint works
@@ -976,201 +1274,6 @@ After implementation:
 
 Mark completed tasks with [x]. Wait for approval before proceeding to Phase 6.
 ```
-
----
-
-### Unit 22.5: Configure RunContextWrapper for User Context Passing
-
-**CRITICAL**: This unit implements the SDK-native pattern for passing custom context (user_id, email, etc.) to agent tools WITHOUT hardcoding parameters through the entire call chain. The `RunContextWrapper` pattern is the official OpenAI Agents SDK solution for providing runtime context that agents don't need to reason about but tools need to access.
-
-**Why This Matters**:
-- **Ownership Problem**: Agent authenticates as agent-user (UUID: 8ef7e6d1-...), but tags must be owned by human user (UUID: 47e8ca62-...)
-- **Without RunContextWrapper**: Hardcode user_id through orchestrator → tags_agent → tools (tight coupling, architectural smell)
-- **With RunContextWrapper**: SDK injects context into tools automatically, agents remain context-agnostic
-- **Educational Value**: Demonstrates SDK-native patterns vs ad-hoc solutions for new developers
-
-**Official Documentation**: https://github.com/openai/openai-agents-python/blob/main/docs/context.md
-
-**Architecture Flow**:
-```
-HTTP Request (user_id: "47e8ca62-...")
-    ↓
-Endpoint creates UserContext(user_id="47e8ca62-...", email="user@example.com")
-    ↓
-Endpoint wraps orchestrator: RunContextWrapper(orchestrator, UserContext)
-    ↓
-Endpoint passes context to Runner.run(..., context=user_context)
-    ↓
-SDK automatically injects context as first parameter to ALL tool calls
-    ↓
-Tools receive: create_tag_tool(ctx: RunContextWrapper[UserContext], tag_name: str)
-    ↓
-Tools access: tag_owner = ctx.context.user_id
-    ↓
-Database insert: {"name": tag_name, "user_id": tag_owner}
-```
-
-**Task List**:
-
-- [ ] **Step 1: Define UserContext Pydantic Model**
-  - Create `backend/app/models/user_context.py` module
-  - Import: `from pydantic import BaseModel, Field`
-  - Define `UserContext` model with fields:
-    * `user_id: str = Field(..., description="UUID of the human user who owns the data")`
-    * `email: str = Field(..., description="Email of the authenticated user")`
-  - Add docstring explaining: "Runtime context passed to all agent tools via RunContextWrapper. Contains human user identity (not agent-user identity)."
-  - Add example usage in docstring showing context access pattern
-  - Write model validation tests
-
-- [ ] **Step 2: Update Tool Signatures to Accept Context**
-  - Modify `backend/app/services/tools/create_tag.py`:
-    * Import: `from agents import RunContextWrapper`
-    * Import: `from ...models.user_context import UserContext`
-    * Change signature: `def create_tag(ctx: RunContextWrapper[UserContext], tag_name: str, item_id: Optional[int] = None) -> dict:`
-    * Extract user_id: `user_id = ctx.context.user_id` (first line of function)
-    * Update docstring: Add ctx parameter documentation, explain RunContextWrapper pattern
-    * Keep agent_client access: `agent_client = ctx.context.agent_client` (if storing in context) OR pass separately
-  - Modify `backend/app/services/tools/search_tags.py`:
-    * Import: `from agents import RunContextWrapper`
-    * Import: `from ...models.user_context import UserContext`
-    * Change signature: `def search_tags(ctx: RunContextWrapper[UserContext], query: str, limit: Optional[int] = 10) -> dict:`
-    * Extract user_id: `user_id = ctx.context.user_id`
-    * Update query filter: `.eq("user_id", user_id)` (already implemented, just add ctx access)
-    * Update docstring with ctx parameter
-  - **CRITICAL**: Context parameter MUST be first parameter for SDK to inject it
-  - **CRITICAL**: Tools still decorated with `@function_tool` - decorator compatible with context pattern
-
-- [ ] **Step 3: Update Tool Wrappers in Tags Agent**
-  - Modify `backend/app/services/app_agents/tags_agent.py`:
-    * Import: `from agents import RunContextWrapper`
-    * Import: `from ...models.user_context import UserContext`
-    * Update `create_tag_tool` wrapper signature: `def create_tag_tool(ctx: RunContextWrapper[UserContext], tag_name: str, idea_id: Optional[int] = None) -> str:`
-    * Pass context to underlying function: `result = create_tag(ctx, tag_name, idea_id)`
-    * Update `search_tags_tool` wrapper signature: `def search_tags_tool(ctx: RunContextWrapper[UserContext], query: str, limit: Optional[int] = 10) -> str:`
-    * Pass context to underlying function: `result = search_tags(ctx, query, limit)`
-    * Update docstrings explaining context parameter
-    * Keep `@function_tool` decorator (decorator handles context injection)
-  - **CRITICAL**: Remove agent_client from closure - pass via context OR keep separate
-  - **Decision Point**: Store agent_client in UserContext OR pass separately to tools (recommend separate for clarity)
-
-- [ ] **Step 4: Modify Endpoint to Create and Pass Context**
-  - Modify `backend/app/api/routes/agent.py`:
-    * Import: `from agents import RunContextWrapper`
-    * Import: `from ...models.user_context import UserContext`
-    * After getting user_id and email from current_user, create context:
-      ```python
-      user_context = UserContext(
-          user_id=user_id,
-          email=current_user["user"]["email"]
-      )
-      ```
-    * Wrap orchestrator with context:
-      ```python
-      orchestrator = create_orchestrator(agent_client)
-      wrapped_orchestrator = RunContextWrapper(orchestrator, user_context)
-      ```
-    * Pass context to Runner.run:
-      ```python
-      result = await Runner.run(
-          wrapped_orchestrator,
-          request_body.message,
-          session=session,
-          context=user_context  # SDK injects this into all tool calls
-      )
-      ```
-    * Add logging: `logger.info(f"Created UserContext for user {user_id}")`
-  - **CRITICAL**: Context passed to Runner.run, NOT to agent factory functions
-  - **CRITICAL**: SDK automatically injects context as first parameter to all decorated tools
-
-- [ ] **Step 5: Revert Factory Function Signatures**
-  - Verify `create_orchestrator(agent_client)` signature has NO user_id parameter (already done in Step 1)
-  - Verify `create_tags_agent(agent_client)` signature has NO user_id parameter (already done in Step 1)
-  - Verify `create_ideas_agent()` signature unchanged (no user_id)
-  - **Status**: All reversions completed in Step 1 above
-
-- [ ] **Step 6: Handle agent_client in Context (Architectural Decision)**
-  - **Option A (Recommended)**: Keep agent_client as closure in tool wrappers, use context only for user_id/email
-    * Pros: Clear separation of SDK client vs runtime data, simpler context model
-    * Cons: Tools still have closure over agent_client
-  - **Option B**: Store agent_client in UserContext, access via `ctx.context.agent_client`
-    * Pros: All runtime dependencies in context, no closures
-    * Cons: Mixing concerns (user data + SDK client), requires typing.cast for client type
-  - **Recommendation**: Use Option A - context for user identity, closure for agent_client
-  - Implement chosen option in tool wrappers
-
-- [ ] **Step 7: Update Documentation and Comments**
-  - Add comments in create_tag.py explaining RunContextWrapper pattern vs hardcoded user_id
-  - Add comments in tags_agent.py explaining context injection by SDK
-  - Add comments in agent.py endpoint explaining context creation and wrapping
-  - Update AGENTS.md with RunContextWrapper pattern as best practice
-  - Add section to PRD Implementation Notes (Unit 22 or Unit 22.5) documenting:
-    * Why RunContextWrapper chosen over alternatives (data model, RLS mapping)
-    * SDK documentation references
-    * Code examples showing context flow
-    * Comparison to rejected approaches (hardcoded threading, etc.)
-
-- [ ] **Step 8: Validation Testing**
-  - Test: "Create a tag called python" → verify tag created with correct user_id (human user, not agent user)
-  - Test: "Search for tags matching 'py'" → verify only human user's tags returned
-  - Verify logs show: "Created UserContext for user 47e8ca62-..."
-  - Verify database: tags.user_id = "47e8ca62-..." (human user UUID)
-  - Verify NO user_id in orchestrator/agent factory signatures
-  - Verify tools receive context as first parameter
-  - Test handoffs still work: "Orchestrator → Tags Agent" visible in logs
-  - Test tool execution: "Calling create_tag..." visible in logs
-
-- [ ] **Step 9: Write Tests for Context Pattern**
-  - Unit test: UserContext model validation
-  - Unit test: Tool receives context correctly, extracts user_id
-  - Integration test: Endpoint creates context, wraps orchestrator, passes to Runner
-  - Integration test: Tag created with correct ownership (human user_id)
-  - Integration test: Search returns only user's tags
-  - Test error handling: Invalid user_id in context
-
-**Common Pitfalls**:
-
-- **Pitfall #1**: Forgetting to make context first parameter in tool signature
-  - SDK expects: `def tool(ctx: RunContextWrapper[T], other_args...)`
-  - Will fail if: `def tool(other_args..., ctx: RunContextWrapper[T])`
-- **Pitfall #2**: Not passing context to Runner.run
-  - Must use: `Runner.run(..., context=user_context)`
-  - SDK won't inject context if not provided to Runner
-- **Pitfall #3**: Wrapping agent before creating it
-  - Correct: Create agent, then wrap: `RunContextWrapper(agent, context)`
-  - Wrong: Trying to pass context to agent factory
-- **Pitfall #4**: Mixing context with hardcoded parameters
-  - Don't pass both ctx AND user_id as separate parameters
-  - Context replaces hardcoded parameters entirely
-
-**Educational Notes for New Developers**:
-
-This pattern demonstrates:
-- **SDK-Native Solutions**: Using built-in framework features vs ad-hoc implementations
-- **Separation of Concerns**: Agents reason about tasks, tools access runtime context, no mixing
-- **Type Safety**: Pydantic models for context ensure type checking and validation
-- **Testability**: Context can be mocked easily in tests vs threading parameters through multiple layers
-- **Maintainability**: Adding new context fields (permissions, org_id, etc.) only touches UserContext model and tools that need it
-
-**Alternative Approaches Rejected**:
-
-1. **Hardcoded user_id Threading** (what we just reverted):
-   - Requires changing every factory signature: orchestrator(user_id) → tags_agent(user_id) → tools(user_id)
-   - Tight coupling between layers
-   - Difficult to extend (add new context fields = change all signatures)
-   - Not SDK-native pattern
-
-2. **Data Model Changes** (created_by vs owned_by):
-   - Could add created_by_agent_id and owned_by_user_id columns
-   - Avoids threading but requires database migration
-   - Doesn't solve general context passing problem (what about permissions, org_id, etc.?)
-   - Mixes data model concerns with runtime context
-
-3. **RLS with Mapping Table**:
-   - Could create agent_to_user_mappings table for RLS to resolve
-   - Complex database logic for simple runtime context problem
-   - Still doesn't provide context for non-ownership use cases
-
-**Why RunContextWrapper Wins**: SDK-native, type-safe, extensible, testable, clear separation of concerns.
 
 ---
 
@@ -1298,120 +1401,124 @@ Before proceeding to Phase 6, confirm:
 
 ---
 
-## Phase 6: Additional Backend Tools & Testing
+## Phase 7: Remaining Tools, Delete Operations & Testing
 
-**Goal**: Expand agent capabilities with more tools (create_idea, search_ideas, delete_tag, etc.) now that UI validation proves multi-agent system works.
+**Goal**: Complete the tool library with remaining CRUD operations (delete_idea, delete_tag, list_tags) and write automated tests for all agent tools.
 
-**Why Now**: Frontend validated orchestrator routing and tool execution display. Safe to expand tool library knowing handoffs show correctly in UI.
+**Why Now**: Phase 4 implemented core tools (create, read, update for ideas and tags). Phase 5 validated UI integration. Now complete the tool set with delete operations and ensure quality with automated tests.
 
-### AI PROMPT: Phase 6 Implementation (Additional Tools)
+**Tools Already Implemented (Phase 4)**:
+
+- Ideas Agent (5 tools): create_idea, search_ideas, list_ideas, get_idea, edit_idea
+- Tags Agent (4 tools): create_tag, search_tags, link_tag_to_idea, edit_tag
+
+### AI PROMPT: Phase 7 Implementation (Remaining Tools & Testing)
 
 ```
-Help me implement Phase 6 - Additional Backend Tools:
+Help me implement Phase 7 - Remaining Tools & Testing:
 
-**CONTEXT**: Phase 5 completed frontend integration - handoffs and tool calls visible in UI.
-- Users confirmed orchestrator routing works ("Orchestrator → Tags Agent" displayed)
-- create_tag tool execution visible end-to-end in chat interface
-- Multi-agent system validated through UI testing
+**CONTEXT**: Phase 4-5 completed core implementation:
+- Ideas Agent has 5 tools: create_idea, search_ideas, list_ideas, get_idea, edit_idea
+- Tags Agent has 4 tools: create_tag, search_tags, link_tag_to_idea, edit_tag
+- UI displays handoffs and tool calls correctly
+- All tools follow functional pattern with RLS enforcement
 
-**TASK**: Implement additional tools following same functional pattern as create_tag.
+**TASK**: Implement remaining tools and write comprehensive tests.
 
 **Tools to Implement**:
-1. create_idea(agent_client, title, content, tags) - Create ideas with optional tags
-2. search_ideas(agent_client, query) - Semantic search across user's ideas
-3. update_idea(agent_client, idea_id, title, content) - Update existing ideas
-4. delete_tag(agent_client, tag_id) - Remove tags with orphan cleanup
-5. list_tags(agent_client, idea_id) - Get tags for specific idea or all user tags
+1. delete_idea(agent_client, user_id, idea_id) - Delete idea with ownership validation and cascade cleanup of tag links
+2. delete_tag(agent_client, user_id, tag_id) - Delete tag with ownership validation and cleanup of idea_tags links
+3. list_tags(agent_client, user_id, idea_id?) - List all user's tags, optionally filtered by idea_id
 
 **Requirements for Each Tool**:
-- Functional implementation (not class-based)
+- Functional implementation following established pattern
 - RLS enforcement via agent_client parameter
-- Comprehensive input validation
-- Clear error messages
-- Docstrings with parameter descriptions
-- Database operations use try/except with specific error handling
-- Return dict with success/error status and data
+- Ownership validation before delete operations
+- Cascade cleanup (delete_idea removes idea_tags entries, delete_tag removes idea_tags entries)
+- Clear confirmation messages ("Deleted idea 'My Idea' and removed 3 tag links")
+- Return dict with success/error status and affected counts
 
 **Update Agents**:
-- Bind new tools to Ideas Agent (create_idea, search_ideas, update_idea)
-- Bind new tools to Tags Agent (delete_tag, list_tags)
-- Update IDEAS_AGENT_INSTRUCTIONS with new tool descriptions and examples
-- Update TAGS_AGENT_INSTRUCTIONS with new tool descriptions and examples
+- Add delete_idea to Ideas Agent
+- Add delete_tag, list_tags to Tags Agent
+- Update agent instructions with delete operation guidance and confirmation examples
 
-**Testing via UI**:
-- Test each tool through chat interface
-- Verify handoffs continue displaying correctly
-- Verify RLS enforcement for all operations
-- Check backend logs for tool call tracing
+**Automated Testing**:
+- Write unit tests for each tool function
+- Write integration tests for agent routing
+- Test RLS enforcement (user cannot delete other user's data)
+- Test cascade cleanup (deleting idea/tag cleans up junction table)
+- Test error handling (delete non-existent, delete already deleted)
 
 After implementation:
 - Show me created tool files
-- Guide me through testing each tool via UI
-- Ask me to confirm tools work end-to-end
+- Run test suite and show results
+- Guide me through UI testing of delete operations
 
 Mark completed tasks with [x]. Wait for approval before proceeding to Phase 7.
 ```
 
 **Tasks:**
 
-- [ ] Implement create_idea tool with title validation, content storage, optional tag linkage
-- [ ] Implement search_ideas tool with semantic search (vector similarity or text search)
-- [ ] Implement update_idea tool with idea ownership validation
-- [ ] Implement delete_tag tool with orphan cleanup logic
+- [ ] Implement delete_idea tool with ownership validation and cascade cleanup of idea_tags
+- [ ] Implement delete_tag tool with ownership validation and cleanup of idea_tags links
 - [ ] Implement list_tags tool with optional idea_id filtering
-- [ ] Bind create_idea, search_ideas, update_idea to Ideas Agent
-- [ ] Bind delete_tag, list_tags to Tags Agent
-- [ ] Update IDEAS_AGENT_INSTRUCTIONS with new tools and examples
-- [ ] Update TAGS_AGENT_INSTRUCTIONS with new tools and examples
-- [ ] Test each tool via UI chat interface
-- [ ] Verify all tools enforce RLS correctly
-- [ ] Confirm handoffs still display properly in UI with new tools
-- [ ] Write automated tests for new tools
-- [ ] Add rate limiting for tool-heavy operations
+- [ ] Add delete_idea_tool wrapper to Ideas Agent (brings total to 6 tools)
+- [ ] Add delete_tag_tool, list_tags_tool wrappers to Tags Agent (brings total to 6 tools)
+- [ ] Update IDEAS_AGENT_INSTRUCTIONS with delete operation guidance
+- [ ] Update TAGS_AGENT_INSTRUCTIONS with delete and list operations guidance
+- [ ] Write unit tests for all Ideas Agent tools (create, search, list, get, edit, delete)
+- [ ] Write unit tests for all Tags Agent tools (create, search, link, edit, delete, list)
+- [ ] Write integration tests for orchestrator routing decisions
+- [ ] Write RLS enforcement tests (cross-user access prevention)
+- [ ] Write cascade cleanup tests (delete idea cleans idea_tags, delete tag cleans idea_tags)
+- [ ] Test delete operations via UI chat interface
+- [ ] Verify error handling for edge cases (delete non-existent, double-delete)
 
 **Phase 6 Validation Checklist:**
 
-- [ ] create_idea works via UI: "Create an idea called X"
-- [ ] search_ideas works via UI: "Find ideas about Y"
-- [ ] update_idea works via UI: "Update idea 5 with new title Z"
-- [ ] delete_tag works via UI: "Delete tag python from my ideas"
-- [ ] list_tags works via UI: "Show me all tags"
-- [ ] UI continues showing handoffs for all operations
-- [ ] Backend logs show all tool executions clearly
-- [ ] RLS verified: all database operations have correct user_id
+- [ ] delete_idea works via UI: "Delete my idea about Python"
+- [ ] delete_tag works via UI: "Delete the javascript tag"
+- [ ] list_tags works via UI: "Show me all my tags" or "What tags does idea 5 have?"
+- [ ] Cascade cleanup verified: deleting idea removes its tag links
+- [ ] Cascade cleanup verified: deleting tag removes its idea links
+- [ ] All unit tests pass: `pytest backend/tests/test_tools.py`
+- [ ] All integration tests pass: `pytest backend/tests/test_agents.py`
+- [ ] RLS tests pass: user cannot delete other user's ideas/tags
+- [ ] Backend logs show delete operations clearly
 
 ---
 
-**PAUSE - Phase 6 Review**
+**PAUSE - Phase 7 Review**
 
-Before proceeding to Phase 7, confirm:
+Before proceeding to Phase 8, confirm:
 
-1. All tools work end-to-end via UI
-2. Handoffs continue displaying correctly with new tools
-3. RLS enforcement verified for all operations
-4. Backend logs show clear tool execution tracing
+1. All 6 Ideas Agent tools functional (create, search, list, get, edit, delete)
+2. All 6 Tags Agent tools functional (create, search, link, edit, delete, list)
+3. Test suite passing with good coverage
+4. Delete operations cascade correctly
 
 ---
 
-## Phase 7: Production Features & Safeguards
+## Phase 8: Production Features & Safeguards (Units 30-33)
 
 **Goal**: Add production-ready features - rate limiting, comprehensive testing, advanced conversation management, and cost controls.
 
 **Why Now**: Core functionality validated via UI. Now add safeguards before wider deployment.
 
-### AI PROMPT: Phase 7 Implementation
+### AI PROMPT: Phase 8 Implementation
 
 ```
-Help me implement Phase 7 - Production Features & Safeguards:
+Help me implement Phase 8 - Production Features & Safeguards:
 
-**CONTEXT**: Phases 4-6 complete:
+**CONTEXT**: Phases 4-7 complete:
 - Backend agent system functional
 - Frontend displays handoffs and tool calls
 - Additional tools implemented and tested via UI
 
 **TASK**: Add production-ready features for safe deployment.
 
-**Unit 26 - Rate Limiting**
+**Unit 30 - Rate Limiting**
 1. Install slowapi library: pip install slowapi
 2. Create rate limiter instance in backend/app/core/rate_limiting.py
 3. Apply rate limiter to /api/v1/agent/chat: 20 requests/minute per user
@@ -1420,7 +1527,7 @@ Help me implement Phase 7 - Production Features & Safeguards:
 6. Return clear error messages with retry-after header
 7. Write rate limiting tests
 
-**Unit 27 - Comprehensive Testing Suite**
+**Unit 31 - Comprehensive Testing Suite**
 8. Write E2E test: "Create tag called python" → verify in database
 9. Write E2E test: "Create idea called X" → verify in database
 10. Write E2E test: Multi-turn conversation maintains context
@@ -1431,7 +1538,7 @@ Help me implement Phase 7 - Production Features & Safeguards:
 15. Write test for handoff logging and display
 16. Create test data fixtures for reproducible testing
 
-**Unit 28 - Advanced Conversation Management**
+**Unit 32 - Advanced Conversation Management**
 17. Create conversations table: id, user_id, title, created_at, updated_at, mode
 18. Create conversation_messages table: id, conversation_id, role, content, metadata, timestamp
 19. Implement conversation auto-saving on each message exchange
@@ -1441,7 +1548,7 @@ Help me implement Phase 7 - Production Features & Safeguards:
 23. Add "New Conversation" button functionality
 24. Test conversation persistence and loading
 
-**Unit 29 - Cost Tracking & Monitoring**
+**Unit 33 - Cost Tracking & Monitoring**
 25. Create user_api_usage table: user_id, date, total_tokens, total_cost, request_count
 26. Implement usage tracking middleware updating stats on each API call
 27. Implement daily cost budget checking ($10/day per user default)
@@ -1457,7 +1564,7 @@ After implementation:
 Mark completed tasks with [x].
 ```
 
-### Unit 26: Rate Limiting
+### Unit 30: Rate Limiting
 
 - [ ] Install slowapi library: `pip install slowapi`
 - [ ] Create rate limiter instance in [backend/app/core/rate_limiting.py](backend/app/core/rate_limiting.py)
@@ -1467,7 +1574,7 @@ Mark completed tasks with [x].
 - [ ] Return clear error messages with `retry-after` header
 - [ ] Write rate limiting tests
 
-### Unit 27: Comprehensive Testing Suite
+### Unit 31: Comprehensive Testing Suite
 
 - [ ] Write E2E test: user sends "Create tag called python", verify tag in database
 - [ ] Write E2E test: user sends "Create idea called X", verify idea in database
@@ -1480,7 +1587,7 @@ Mark completed tasks with [x].
 - [ ] Create test data fixtures for reproducible agent testing
 - [ ] Document test scenarios and expected behaviors
 
-### Unit 28: Advanced Conversation Management
+### Unit 32: Advanced Conversation Management
 
 - [ ] Create `conversations` table: id, user_id, title, created_at, updated_at, mode (responses_api | agent_sdk)
 - [ ] Create `conversation_messages` table: id, conversation_id, role, content, metadata, timestamp
@@ -1491,7 +1598,7 @@ Mark completed tasks with [x].
 - [ ] Add "New Conversation" button functionality
 - [ ] Test conversation persistence and loading across sessions
 
-### Unit 29: Cost Tracking & Monitoring
+### Unit 33: Cost Tracking & Monitoring
 
 - [ ] Create `user_api_usage` table: user_id, date, total_tokens, total_cost, request_count
 - [ ] Implement usage tracking middleware updating stats on each API call (both Responses and Agent)
@@ -1501,7 +1608,7 @@ Mark completed tasks with [x].
 - [ ] Add alerts when user approaching 80% of daily budget
 - [ ] Write tests for cost tracking accuracy and budget enforcement
 
-**Phase 7 Validation Checklist:**
+**Phase 8 Validation Checklist:**
 
 - [ ] Rate limiting prevents abuse (test rapid requests)
 - [ ] All E2E tests passing
@@ -1512,7 +1619,7 @@ Mark completed tasks with [x].
 
 ---
 
-**PAUSE - Phase 7 Review**
+**PAUSE - Phase 8 Review**
 
 Before final deployment, confirm:
 
@@ -1524,360 +1631,278 @@ Before final deployment, confirm:
 
 ---
 
-## Phase 8: Advanced Features (Optional Future Enhancements)
+## Phase 9: Advanced Features (Optional Future Enhancements)
 
-**Note**: These features are optional and should only be implemented after Phases 4-7 are complete and stable.
+**Note**: These features are optional and should only be implemented after Phases 4-8 are complete and stable.
 
 ### Potential Future Features:
 
-- Web search integration for enriching ideas with external content
-- Multi-modal support (image uploads for idea visualization)
-- Collaborative features (shared ideas, team workspaces)
-- Advanced analytics (idea trends, tag usage patterns)
-- Export capabilities (PDF, Markdown, JSON)
-- Browser extension for capturing ideas from web pages
+- **Unit 34**: Web search integration for enriching ideas with external content
+- **Unit 35**: Multi-modal support (image uploads for idea visualization)
+- **Unit 36**: Collaborative features (shared ideas, team workspaces)
+- **Unit 37**: Advanced analytics (idea trends, tag usage patterns)
+- **Unit 38**: Export capabilities (PDF, Markdown, JSON)
+- **Unit 39**: Browser extension for capturing ideas from web pages
+- **Unit 40**: RunContextWrapper for SDK-native user context passing
 
 ---
 
-## ARCHIVE: Original Phase 6 Content (Moved to Phase 5)
+### Unit 40: RunContextWrapper for SDK-Native User Context Passing
 
-**Note**: This content has been reorganized. Phase 5 now contains frontend integration, Phase 6 contains additional backend tools.
+**Note**: This is an optional enhancement to replace the current closure-based pattern with the SDK-native RunContextWrapper pattern. The current implementation works correctly; this unit provides an architectural improvement for better separation of concerns.
 
-<details>
-<summary>Click to view original Phase 6 structure (for reference only)</summary>
-- [ ] Add conversation memory tracking which specialist handled each turn
-- [ ] Implement specialist response forwarding to user
-- [ ] Add logging for routing decisions with rationale
-- [ ] Implement fallback to direct answer when no specialist needed
-- [ ] Write tests for routing decisions, specialist delegation, fallback handling
+**CRITICAL**: This unit implements the SDK-native pattern for passing custom context (user_id, email, etc.) to agent tools WITHOUT hardcoding parameters through the entire call chain. The `RunContextWrapper` pattern is the official OpenAI Agents SDK solution for providing runtime context that agents don't need to reason about but tools need to access.
 
-### Unit 22: Agent SDK Backend Endpoint
+**Why This Matters**:
 
-- [ ] Create `POST /api/v1/agent/chat` endpoint in `backend/app/api/routes/agent.py`
-- [ ] Implement request handling accepting user message and optional conversation history
-- [ ] Get authenticated user from session
-- [ ] Get agent client for RLS-enforced operations
-- [ ] Call orchestrator to process request and route to specialists
-- [ ] If agent executes tool, call tool execution handler
-- [ ] Return agent response including action, rationale, tool results if applicable
-- [ ] Implement rate limiting (20 agent requests per minute per user)
-- [ ] Add request ID tracking through entire agent pipeline
-- [ ] Implement error handling returning safe messages (never expose tool internals)
-- [ ] Add endpoint documentation with request/response examples
-- [ ] Write endpoint tests: tool execution, clarification, refusal, errors
+- **Ownership Problem**: Agent authenticates as agent-user (UUID: 8ef7e6d1-...), but tags must be owned by human user (UUID: 47e8ca62-...)
+- **Without RunContextWrapper**: Hardcode user_id through orchestrator → tags_agent → tools (tight coupling, architectural smell)
+- **With RunContextWrapper**: SDK injects context into tools automatically, agents remain context-agnostic
+- **Educational Value**: Demonstrates SDK-native patterns vs ad-hoc solutions for new developers
 
----
+**Official Documentation**: https://github.com/openai/openai-agents-python/blob/main/docs/context.md
 
-**PAUSE**
-
----
-
-## Phase 6: Frontend Agent Interface (Units 23-26)
-
-### AI PROMPT: Phase 6 Implementation (Units 23-26)
+**Architecture Flow**:
 
 ```
-Help me implement Phase 6 - Frontend Agent Interface (Units 23-26):
-
-**Unit 23 - Redux Agent Slice Extension**
-1. Extend ChatState interface with agent-specific fields: agent_status, current_action, tool_results
-2. Add agentStatus field with values: idle, thinking, acting, waiting_confirmation
-3. Add reducers: setAgentStatus, addToolResult, requestConfirmation
-4. Create sendAgentMessage async thunk calling /api/v1/agent/chat
-5. Implement thunk handling different agent actions: answer (add message), tool call (show action + result), clarify (show question)
-6. Add confirmation flow state management for operations requiring user approval
-7. Extend selectors for agent-specific state
-8. Write tests for new reducers and agent message thunk
-
-**Unit 24 - Agent Message Components**
-9. Extend MessageCard component to handle agent response types
-10. Create ActionBadge component showing tool execution indicators (create_tag, create_item)
-11. Create ToolResultCard component displaying tool execution results with success/error states
-12. Implement different styling for different agent actions (thinking, acting, clarifying, refusing)
-13. Add ThinkingIndicator animation component for when agent is processing
-14. Create ClarificationPrompt component displaying agent questions with suggested responses
-15. Create ConfirmationDialog component for operations requiring user approval
-16. Add confidence score display (optional, collapsible) for debugging
-17. Implement copy button for agent rationale text
-18. Make all components accessible with ARIA labels
-19. Write component tests
-
-**Unit 25 - Agent Chat Mode Toggle**
-20. Add chatMode field to Redux chat state with values: responses_api, agent_sdk
-21. Add reducer for toggling chat mode
-22. Create ChatModeToggle component with segmented control or tabs UI
-23. Display mode descriptions: "Ask Questions" (Responses) vs "Take Actions" (Agent)
-24. Show appropriate icons for each mode
-25. Clear conversation when switching modes with user confirmation
-26. Update ChatInterface to call correct API based on mode
-27. Add helpful hints specific to each mode in UI
-28. Save mode preference to localStorage
-29. Write tests for mode switching behavior
-
-**Unit 26 - Agent Integration Testing**
-30. Write E2E test: user sends "Create tag called python", verify tag created in database
-31. Write E2E test: user sends ambiguous request, verify clarification question shown
-32. Write E2E test: user sends unsafe request, verify polite refusal
-33. Write E2E test: agent confidence scoring works (high confidence → execute, low confidence → clarify)
-34. Write test for multi-turn conversation maintaining context
-35. Write test for RLS enforcement in agent tool execution
-36. Write test for rate limiting on agent endpoint
-37. Write test for orchestrator routing (items vs tags requests)
-38. Write performance test: agent response time < 3s p95
-39. Write test for error recovery (OpenAI API failure, database error, etc.)
-40. Create test data fixtures for reproducible agent testing
-41. Document test scenarios and expected behaviors
-
-**Phase 6 Validation**
-42. Login and navigate to /chat
-43. Toggle between Responses API and Agent SDK modes
-44. Verify mode switch clears conversation with confirmation
-45. Verify mode preference persists after page reload
-46. Switch to Agent mode and send: "Create a tag called javascript for my latest item"
-47. Verify ThinkingIndicator shows while processing
-48. Verify ActionBadge displays "create_tag" action
-49. Verify ToolResultCard shows success message
-50. Verify tag appears in database for correct item
-51. Test clarification flow with ambiguous message: "Do something with my data"
-52. Test confirmation flow with: "Delete all tags from my item"
-53. Test multi-turn conversation maintaining context
-54. Test error handling with network disconnect
-55. Navigate agent interface with keyboard only and verify accessibility
-56. Measure agent response rendering time and verify UI responsiveness
-
-After implementation:
-- Show me files for review
-- Guide me through testing
-- Ask me to confirm tests pass
-
-Mark completed tasks with [x]. Wait for approval before proceeding to Phase 7.
+HTTP Request (user_id: "47e8ca62-...")
+    ↓
+Endpoint creates UserContext(user_id="47e8ca62-...", email="user@example.com")
+    ↓
+Endpoint wraps orchestrator: RunContextWrapper(orchestrator, UserContext)
+    ↓
+Endpoint passes context to Runner.run(..., context=user_context)
+    ↓
+SDK automatically injects context as first parameter to ALL tool calls
+    ↓
+Tools receive: create_tag_tool(ctx: RunContextWrapper[UserContext], tag_name: str)
+    ↓
+Tools access: tag_owner = ctx.context.user_id
+    ↓
+Database insert: {"name": tag_name, "user_id": tag_owner}
 ```
 
-</details>
+**Task List**:
+
+- [ ] **Step 1: Define UserContext Pydantic Model**
+
+  - Create `backend/app/models/user_context.py` module
+  - Import: `from pydantic import BaseModel, Field`
+  - Define `UserContext` model with fields:
+    - `user_id: str = Field(..., description="UUID of the human user who owns the data")`
+    - `email: str = Field(..., description="Email of the authenticated user")`
+  - Add docstring explaining: "Runtime context passed to all agent tools via RunContextWrapper. Contains human user identity (not agent-user identity)."
+  - Add example usage in docstring showing context access pattern
+  - Write model validation tests
+
+- [ ] **Step 2: Update Tool Signatures to Accept Context**
+
+  - Modify `backend/app/services/tools/create_tag.py`:
+    - Import: `from agents import RunContextWrapper`
+    - Import: `from ...models.user_context import UserContext`
+    - Change signature: `def create_tag(ctx: RunContextWrapper[UserContext], tag_name: str, item_id: Optional[int] = None) -> dict:`
+    - Extract user_id: `user_id = ctx.context.user_id` (first line of function)
+    - Update docstring: Add ctx parameter documentation, explain RunContextWrapper pattern
+    - Keep agent_client access: `agent_client = ctx.context.agent_client` (if storing in context) OR pass separately
+  - Modify `backend/app/services/tools/search_tags.py`:
+    - Import: `from agents import RunContextWrapper`
+    - Import: `from ...models.user_context import UserContext`
+    - Change signature: `def search_tags(ctx: RunContextWrapper[UserContext], query: str, limit: Optional[int] = 10) -> dict:`
+    - Extract user_id: `user_id = ctx.context.user_id`
+    - Update query filter: `.eq("user_id", user_id)` (already implemented, just add ctx access)
+    - Update docstring with ctx parameter
+  - **CRITICAL**: Context parameter MUST be first parameter for SDK to inject it
+  - **CRITICAL**: Tools still decorated with `@function_tool` - decorator compatible with context pattern
+
+- [ ] **Step 3: Update Tool Wrappers in Tags Agent**
+
+  - Modify `backend/app/services/app_agents/tags_agent.py`:
+    - Import: `from agents import RunContextWrapper`
+    - Import: `from ...models.user_context import UserContext`
+    - Update `create_tag_tool` wrapper signature: `def create_tag_tool(ctx: RunContextWrapper[UserContext], tag_name: str, idea_id: Optional[int] = None) -> str:`
+    - Pass context to underlying function: `result = create_tag(ctx, tag_name, idea_id)`
+    - Update `search_tags_tool` wrapper signature: `def search_tags_tool(ctx: RunContextWrapper[UserContext], query: str, limit: Optional[int] = 10) -> str:`
+    - Pass context to underlying function: `result = search_tags(ctx, query, limit)`
+    - Update docstrings explaining context parameter
+    - Keep `@function_tool` decorator (decorator handles context injection)
+  - **CRITICAL**: Remove agent_client from closure - pass via context OR keep separate
+  - **Decision Point**: Store agent_client in UserContext OR pass separately to tools (recommend separate for clarity)
+
+- [ ] **Step 4: Modify Endpoint to Create and Pass Context**
+
+  - Modify `backend/app/api/routes/agent.py`:
+    - Import: `from agents import RunContextWrapper`
+    - Import: `from ...models.user_context import UserContext`
+    - After getting user_id and email from current_user, create context:
+      ```python
+      user_context = UserContext(
+          user_id=user_id,
+          email=current_user["user"]["email"]
+      )
+      ```
+    - Wrap orchestrator with context:
+      ```python
+      orchestrator = create_orchestrator(agent_client)
+      wrapped_orchestrator = RunContextWrapper(orchestrator, user_context)
+      ```
+    - Pass context to Runner.run:
+      ```python
+      result = await Runner.run(
+          wrapped_orchestrator,
+          request_body.message,
+          session=session,
+          context=user_context  # SDK injects this into all tool calls
+      )
+      ```
+    - Add logging: `logger.info(f"Created UserContext for user {user_id}")`
+  - **CRITICAL**: Context passed to Runner.run, NOT to agent factory functions
+  - **CRITICAL**: SDK automatically injects context as first parameter to all decorated tools
+
+- [ ] **Step 5: Revert Factory Function Signatures**
+
+  - Verify `create_orchestrator(agent_client)` signature has NO user_id parameter (already done in Step 1)
+  - Verify `create_tags_agent(agent_client)` signature has NO user_id parameter (already done in Step 1)
+  - Verify `create_ideas_agent()` signature unchanged (no user_id)
+  - **Status**: All reversions completed in Step 1 above
+
+- [ ] **Step 6: Handle agent_client in Context (Architectural Decision)**
+
+  - **Option A (Recommended)**: Keep agent_client as closure in tool wrappers, use context only for user_id/email
+    - Pros: Clear separation of SDK client vs runtime data, simpler context model
+    - Cons: Tools still have closure over agent_client
+  - **Option B**: Store agent_client in UserContext, access via `ctx.context.agent_client`
+    - Pros: All runtime dependencies in context, no closures
+    - Cons: Mixing concerns (user data + SDK client), requires typing.cast for client type
+  - **Recommendation**: Use Option A - context for user identity, closure for agent_client
+  - Implement chosen option in tool wrappers
+
+- [ ] **Step 7: Update Documentation and Comments**
+
+  - Add comments in create_tag.py explaining RunContextWrapper pattern vs hardcoded user_id
+  - Add comments in tags_agent.py explaining context injection by SDK
+  - Add comments in agent.py endpoint explaining context creation and wrapping
+  - Update AGENTS.md with RunContextWrapper pattern as best practice
+  - Add section to PRD Implementation Notes documenting:
+    - Why RunContextWrapper chosen over alternatives (data model, RLS mapping)
+    - SDK documentation references
+    - Code examples showing context flow
+    - Comparison to rejected approaches (hardcoded threading, etc.)
+
+- [ ] **Step 8: Validation Testing**
+
+  - Test: "Create a tag called python" → verify tag created with correct user_id (human user, not agent user)
+  - Test: "Search for tags matching 'py'" → verify only human user's tags returned
+  - Verify logs show: "Created UserContext for user 47e8ca62-..."
+  - Verify database: tags.user_id = "47e8ca62-..." (human user UUID)
+  - Verify NO user_id in orchestrator/agent factory signatures
+  - Verify tools receive context as first parameter
+  - Test handoffs still work: "Orchestrator → Tags Agent" visible in logs
+  - Test tool execution: "Calling create_tag..." visible in logs
+
+- [ ] **Step 9: Write Tests for Context Pattern**
+  - Unit test: UserContext model validation
+  - Unit test: Tool receives context correctly, extracts user_id
+  - Integration test: Endpoint creates context, wraps orchestrator, passes to Runner
+  - Integration test: Tag created with correct ownership (human user_id)
+  - Integration test: Search returns only user's tags
+  - Test error handling: Invalid user_id in context
+
+**Common Pitfalls**:
+
+- **Pitfall #1**: Forgetting to make context first parameter in tool signature
+  - SDK expects: `def tool(ctx: RunContextWrapper[T], other_args...)`
+  - Will fail if: `def tool(other_args..., ctx: RunContextWrapper[T])`
+- **Pitfall #2**: Not passing context to Runner.run
+  - Must use: `Runner.run(..., context=user_context)`
+  - SDK won't inject context if not provided to Runner
+- **Pitfall #3**: Wrapping agent before creating it
+  - Correct: Create agent, then wrap: `RunContextWrapper(agent, context)`
+  - Wrong: Trying to pass context to agent factory
+- **Pitfall #4**: Mixing context with hardcoded parameters
+  - Don't pass both ctx AND user_id as separate parameters
+  - Context replaces hardcoded parameters entirely
+
+**Educational Notes for New Developers**:
+
+This pattern demonstrates:
+
+- **SDK-Native Solutions**: Using built-in framework features vs ad-hoc implementations
+- **Separation of Concerns**: Agents reason about tasks, tools access runtime context, no mixing
+- **Type Safety**: Pydantic models for context ensure type checking and validation
+- **Testability**: Context can be mocked easily in tests vs threading parameters through multiple layers
+- **Maintainability**: Adding new context fields (permissions, org_id, etc.) only touches UserContext model and tools that need it
+
+**Alternative Approaches Rejected**:
+
+1. **Hardcoded user_id Threading** (current implementation - works but not SDK-native):
+
+   - Requires changing every factory signature: orchestrator(user_id) → tags_agent(user_id) → tools(user_id)
+   - Tight coupling between layers
+   - Difficult to extend (add new context fields = change all signatures)
+   - Not SDK-native pattern
+
+2. **Data Model Changes** (created_by vs owned_by):
+
+   - Could add created_by_agent_id and owned_by_user_id columns
+   - Avoids threading but requires database migration
+   - Doesn't solve general context passing problem (what about permissions, org_id, etc.?)
+   - Mixes data model concerns with runtime context
+
+3. **RLS with Mapping Table**:
+   - Could create agent_to_user_mappings table for RLS to resolve
+   - Complex database logic for simple runtime context problem
+   - Still doesn't provide context for non-ownership use cases
+
+**Why RunContextWrapper Wins**: SDK-native, type-safe, extensible, testable, clear separation of concerns.
 
 ---
 
-## Summary of Phase Reorganization
+## Recommended Final PRD Structure
 
-**NEW STRUCTURE (Implementation Flow):**
+**Phase 4: Tool Specification & Base Infrastructure (Units 15-18)**
 
-- **Phase 4**: Backend Core Agent Infrastructure ✅ COMPLETE
-  - Orchestrator + specialist agents
-  - Functional tool pattern (create_tag)
-  - Agent endpoint `/api/v1/agent/chat`
-  - Basic session management
-- **Phase 5**: Frontend Integration & UI Validation (Units 23-25)
+- Unit 15: Functional Tool Implementation
+- Unit 16: @function_tool Decorator Pattern
+- Unit 17: Pydantic Models for Agent Responses
+- Unit 18: Agent System Prompts
 
-  - Mode toggle (Responses vs Agent)
-  - Redux agent slice
-  - Agent message components
-  - **Critical**: Display handoffs and tool calls in UI
-  - Validate multi-agent system visually
+**Phase 5: Agent Implementation & Backend Endpoint (Units 19-22)**
 
-- **Phase 6**: Additional Backend Tools
+- Unit 19: Ideas Specialist Agent
+- Unit 20: Tags Specialist Agent
+- Unit 21: Orchestrator Agent
+- Unit 22: Agent SDK Backend Endpoint
 
-  - create_idea, search_ideas, update_idea
-  - delete_tag, list_tags
-  - Expand tool library after UI validation
+**Phase 6: Frontend Integration & UI Validation (Units 23-25)**
 
-- **Phase 7**: Production Features (Units 26-29)
+- Unit 23: Redux Agent Slice Extension
+- Unit 24: Agent Message Components
+- Unit 25: Agent Chat Mode Toggle
 
-  - Rate limiting
-  - Comprehensive testing
-  - Conversation management
-  - Cost tracking
+**Phase 7: Remaining Tools, Delete Operations & Testing (Units 26-29)**
 
-- **Phase 8**: Future Enhancements (Optional)
-  - Web search integration
-  - Advanced observability
-  - Multi-modal support
+- Unit 26: delete_idea Tool
+- Unit 27: delete_tag Tool
+- Unit 28: list_tags Tool
+- Unit 29: Agent Tool Testing Suite
 
-**Rationale**: Build backend core → Validate via frontend UI → Expand backend tools → Add production safeguards
+**Phase 8: Production Features & Safeguards (Units 30-33)**
 
----
+- Unit 30: Rate Limiting
+- Unit 31: Comprehensive Testing Suite
+- Unit 32: Advanced Conversation Management
+- Unit 33: Cost Tracking & Monitoring
 
-## ARCHIVE SECTION BELOW
+**Phase 9: Advanced Features (Optional Future Enhancements - Units 34-40)**
 
-<details>
-<summary>Original Phase 6 Frontend Content (Now in Phase 5)</summary>
-
-### Unit 23: Redux Agent Slice Extension
-
-- [ ] Display mode descriptions: "Ask Questions" (Responses) vs "Take Actions" (Agent)
-- [ ] Show appropriate icons for each mode
-- [ ] Clear conversation when switching modes with user confirmation
-- [ ] Update ChatInterface to call correct API based on mode
-- [ ] Add helpful hints specific to each mode in UI
-- [ ] Save mode preference to localStorage
-- [ ] Write tests for mode switching behavior
-
-### Unit 26: Agent Integration Testing
-
-- [ ] Write E2E test: user sends "Create tag called python", verify tag created in database
-- [ ] Write E2E test: user sends ambiguous request, verify clarification question shown
-- [ ] Write E2E test: user sends unsafe request, verify polite refusal
-- [ ] Write E2E test: agent confidence scoring works (high confidence → execute, low confidence → clarify)
-- [ ] Write test for multi-turn conversation maintaining context
-- [ ] Write test for RLS enforcement in agent tool execution
-- [ ] Write test for rate limiting on agent endpoint
-- [ ] Write test for orchestrator routing (items vs tags requests)
-- [ ] Write performance test: agent response time < 3s p95
-- [ ] Write test for error recovery (OpenAI API failure, database error, etc.)
-- [ ] Create test data fixtures for reproducible agent testing
-- [ ] Document test scenarios and expected behaviors
-
-</details>
-
----
-
-End of Document 41. Implement metrics tracking: success rate, average confidence, tool usage distribution, error rates 42. Add debug mode query parameter for verbose agent responses showing internal reasoning 43. Create admin UI component displaying agent statistics and trends 44. Implement alerting for anomalies (sudden spike in errors) 45. Add ability to replay agent decisions from audit log for debugging 46. Write documentation for monitoring and debugging agents 47. Implement log retention policies
-
-**Unit 31 - Error Handling & Failure Modes** 48. Document all possible failure modes: OpenAI API down, rate limits, invalid responses, tool execution failures, RLS violations, database errors, timeouts 49. Implement graceful degradation when OpenAI unavailable (show status message) 50. Add retry logic with exponential backoff for transient failures 51. Implement circuit breaker pattern for OpenAI API calls 52. Add comprehensive error messages explaining what went wrong and suggested actions 53. Implement error recovery: invalid JSON from agent → retry once with stricter prompt 54. Add timeout handling for long-running operations (30 second max)
-
----
-
-## ARCHIVE: Original Phase 7 Content (Advanced Features - Future)
-
-**Note**: The following units (27-32) from original Phase 7 describe advanced features like web search, observability, and monitoring. These are optional future enhancements after core functionality is stable.
-
-<details>
-<summary>Click to view original Phase 7 advanced features (for reference only)</summary>
-
-### Unit 27: Built-in Web Search Integration (FUTURE)
-
-- [ ] Research OpenAI's current web search/browsing capabilities
-- [ ] Update agent system prompts to include web search
-- [ ] Implement web search tool wrapper
-- [ ] Add cost tracking for web search operations
-
-### Unit 28: Rate Limiting & Cost Controls (MOVED TO PHASE 7, UNIT 26)
-
-(Moved to new Phase 7 as Unit 26)
-
-### Unit 29: Advanced Conversation Management (MOVED TO PHASE 7, UNIT 28)
-
-(Moved to new Phase 7 as Unit 28)
-
-### Unit 30: Agent Observability & Monitoring (FUTURE)
-
-- [ ] Create admin UI component displaying agent statistics and trends
-- [ ] Implement alerting for anomalies (e.g., sudden spike in errors)
-- [ ] Add ability to replay agent decisions from audit log for debugging
-- [ ] Write documentation for monitoring and debugging agents
-- [ ] Implement log retention policies
-
-### Unit 31: Error Handling & Failure Modes
-
-- [ ] Document all possible failure modes: OpenAI API down, rate limits, invalid responses, tool execution failures, RLS violations, database errors, timeouts
-- [ ] Implement graceful degradation when OpenAI unavailable (show status message)
-- [ ] Add retry logic with exponential backoff for transient failures
-- [ ] Implement circuit breaker pattern for OpenAI API calls
-- [ ] Add comprehensive error messages explaining what went wrong and suggested actions
-- [ ] Implement error recovery: invalid JSON from agent → retry once with stricter prompt
-- [ ] Add timeout handling for long-running operations (30 second max)
-- [ ] Implement partial success handling (some tool operations succeed, some fail)
-- [ ] Add user-facing error documentation explaining common issues
-- [ ] Create error testing suite simulating all failure modes
-- [ ] Implement error monitoring and alerting
-- [ ] Write runbook for common error scenarios
-
-### Unit 32: Documentation & Deployment Guide
-
-- [ ] Write `docs/ai_system/architecture.md` explaining dual-mode pattern and agent architecture
-- [ ] Write `docs/ai_system/responses_api_guide.md` documenting Responses API usage
-- [ ] Write `docs/ai_system/agent_sdk_guide.md` documenting Agent SDK usage and specialist system
-- [ ] Write `docs/ai_system/tools.md` documenting all tools with contracts and examples
-- [ ] Write `docs/ai_system/prompts.md` documenting all system prompts and tuning guidelines
-- [ ] Write `docs/ai_system/deployment.md` with environment setup, configuration, and deployment steps
-- [ ] Create user guide for chat interface with screenshots
-- [ ] Document rate limits, cost controls, and quotas
-- [ ] Write API reference for all AI endpoints
-- [ ] Create troubleshooting guide for common issues
-- [ ] Write security documentation explaining RLS enforcement and agent-user pattern
-- [ ] Create developer onboarding guide for extending the system
-- [ ] Update project README with AI system overview and links to detailed docs
-- [ ] Write commit message summarizing Session 4 deliverables
-
----
-
-**PAUSE**
-
----
-
-## AI PROMPT: Final Validation - Complete Session 4
-
-```
-Help me perform final validation of complete Session 4 implementation:
-
-COMPREHENSIVE SYSTEM TEST:
-
-1. Responses API Full Flow:
-   - Login, navigate to /chat, select Responses mode
-   - Send query: "Show me all items created this month"
-   - Verify: SQL generated safely, results displayed, costs tracked
-
-2. Agent SDK Full Flow:
-   - Switch to Agent mode
-   - Send: "Create an item called Session 4 Complete"
-   - Send: "Tag it with done and ai-agents"
-   - Verify: Both operations execute successfully, items visible in database
-
-3. Security Validation:
-   - Verify RLS prevents cross-user data access (both modes)
-   - Verify agent-user credentials encrypted in database
-   - Verify no secrets in logs or error messages
-
-4. Production Readiness:
-   - Verify rate limiting working (both endpoints)
-   - Verify cost tracking accurate
-   - Verify error handling graceful for all failure modes
-   - Verify conversation history persists
-   - Verify all tests passing (backend + frontend)
-
-5. Documentation Review:
-   - Review all docs/ai_system/ documentation
-   - Verify deployment guide complete
-   - Verify API reference accurate
-   - Verify user guide helpful
-
-6. Performance Validation:
-   - Responses API p95 latency < 2s
-   - Agent SDK p95 latency < 3s
-   - Frontend remains responsive during all operations
-
-7. Final Commit:
-   - Stage all changes
-   - Commit with message: "Session 4: OpenAI Responses API & Agent SDK Implementation - Complete dual-mode AI system with RLS enforcement, multi-specialist agents, tool execution, conversation management, and production safeguards"
-   - Push to repository
-
-After validation:
-- Show me final test results
-- Confirm all documentation complete
-- Verify commit successful
-
-SESSION 4 COMPLETE! 🎉
-```
-
----
-
-- [ ] Add inline code comments for complex logic
-- [ ] Write CHANGELOG documenting all features
-
-**Success Criteria**:
-
-- New developers can understand system from documentation
-- Users can effectively use both chat modes
-- Deployment process clearly documented
-- Troubleshooting guide helps resolve common issues
-- API documentation complete and accurate
-
-**Estimated Effort**: 4-5 hours
-
----
-
-PAUSE
+- Unit 34: Web Search Integration
+- Unit 35: Multi-Modal Support
+- Unit 36: Collaborative Features
+- Unit 37: Advanced Analytics
+- Unit 38: Export Capabilities
+- Unit 39: Browser Extension
+- Unit 40: RunContextWrapper for SDK-Native User Context
 
 ---
 
 **END OF BEAST MODE PRD - SESSION 4 PART B**
-````
